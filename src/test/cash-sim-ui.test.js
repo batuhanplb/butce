@@ -217,19 +217,23 @@ describe("Nakit akışında geçmiş aylar", () => {
     dom.window.close();
   });
 
-  it("geçmiş ayın ay sonu kalanı, sonraki ayın 'elde' değeriyle aynıdır", async () => {
+  it("geçmiş ay, bugünkü bakiyeden geriye yürütülerek doğru hesaplanır", async () => {
     const dom = boot(seedRecurring());
     const w = dom.window;
     await flush();
-    const kal = () => txt([...w.document.querySelectorAll(".cash-sum > div")][2]);
-    const elde = () => txt(w.document.querySelector(".crow.elde-row"));
     click(w, [...w.document.querySelectorAll('.cash-nav [data-act="cash-open"]')][0]);
     await flush();
-    const pastKalan = kal();
-    click(w, [...w.document.querySelectorAll('.cash-nav [data-act="cash-open"]')].slice(-1)[0]);
+    const cells = () => [...w.document.querySelectorAll(".cash-sum > div")].map(txt);
+    // Elde 100.000 (cari ayın başı) + o ayın 5.000 ₺ kirayı düşmemiş hali = 105.000.
+    expect(cells()[0]).toContain("105.000");
+    expect(cells()[1]).toContain("5.000");
+    expect(cells()[2]).toContain("100.000");
+    // Kalem tiklenince (gerçekleşti) o ayın çıkışı düşer, elde bugünkü bakiyeye iner.
+    click(w, w.document.querySelector('.crow [data-act="cash-tick"][data-ref$="|' + ym(-1) + '"]'));
     await flush();
-    expect(txt(w.document.querySelector(".cash-nav b"))).toBe(labelOf(ym(0)));
-    expect(elde()).toContain(pastKalan.replace(/.*kalan\s*/, ""));
+    expect(cells()[0]).toContain("100.000");
+    expect(cells()[1]).not.toContain("5.000");
+    expect(cells()[2]).toContain("100.000");
     dom.window.close();
   });
 });
