@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.11.1";
+const APP_VERSION = "1.3.11.2";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1205,9 +1205,9 @@ function rememberScroll() { (S._sy = S._sy || {})[S.view] = window.scrollY; }
 function restoreScroll(v) { const y = (S._sy || {})[v] || 0; window.scrollTo(0, y); requestAnimationFrame(() => window.scrollTo(0, y)); }
 function suppressAutofill(host) {
   host.querySelectorAll('input:not([type="file"]):not([type="checkbox"]):not([type="color"]),textarea').forEach((x, i) => {
-    x.autocomplete = "off"; x.setAttribute("autocorrect", "off"); x.spellcheck = false;
+    x.setAttribute("autocomplete", x.type === "search" ? "off" : "butce-" + Math.random().toString(36).slice(2, 7)); x.setAttribute("autocorrect", "off"); x.setAttribute("autocapitalize", "off"); x.spellcheck = false;
     x.setAttribute("data-lpignore", "true"); x.setAttribute("data-1p-ignore", "true"); x.setAttribute("data-form-type", "other");
-    x.name = "butce-entry-" + i; x.removeAttribute("list");
+    x.name = "bx" + Math.random().toString(36).slice(2, 8); x.id || x.setAttribute("aria-autocomplete", "none"); x.removeAttribute("list");
   });
 }
 function accountMenu(id, anchor) {
@@ -1245,6 +1245,14 @@ function openTx(opt = {}) {
   }
   renderTx(); if (D._new) setTimeout(() => { const i = $("#f-amt"); i && i.focus(); }, 80);
 }
+function dpHtml() {
+  const v = D.dpV || D.d.slice(0, 7); const [y, m] = v.split("-").map(Number); const first = (new Date(y, m - 1, 1).getDay() + 6) % 7; const n = new Date(y, m, 0).getDate(); const td = today();
+  const iso = dd => y + "-" + String(m).padStart(2, "0") + "-" + String(dd).padStart(2, "0");
+  const sh = k => { const x = new Date(); x.setDate(x.getDate() + k); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+  let g = ""; for (let i = 0; i < first; i++) g += "<span></span>";
+  for (let dd = 1; dd <= n; dd++) { const d = iso(dd); g += '<button type="button" data-act="dp-set" data-v="' + d + '" class="' + (d === D.d ? "on" : "") + (d === td ? " td" : "") + '">' + dd + '</button>'; }
+  return '<div class="dpick"><div class="dp-q"><button type="button" data-act="dp-set" data-v="' + sh(-1) + '">Dün</button><button type="button" data-act="dp-set" data-v="' + td + '">Bugün</button><button type="button" data-act="dp-set" data-v="' + sh(1) + '">Yarın</button></div><div class="dp-h"><button type="button" class="ib" data-act="dp-mv" data-d="-1" aria-label="Önceki ay">' + ICON.l + '</button><b>' + C.TR_M[m - 1] + " " + y + '</b><button type="button" class="ib" data-act="dp-mv" data-d="1" aria-label="Sonraki ay">' + ICON.r + '</button></div><div class="dp-w"><span>Pt</span><span>Sa</span><span>Ça</span><span>Pe</span><span>Cu</span><span>Ct</span><span>Pz</span></div><div class="dp-g">' + g + '</div></div>';
+}
 function renderTx(keep) {
   const k = D.k, accs = visibleAccs();
   const title = (D._new ? "Yeni " : "") + { e: "gider", i: "gelir", tr: "transfer" }[k];
@@ -1263,9 +1271,10 @@ function renderTx(keep) {
     h += '<div id="spbox">' + spBox() + '</div>';
     h += '</div>';
   }
-  const dateF = '<label class="fld tx-date"><span>Tarih</span><input class="in" type="date" value="' + esc(D.d) + '" data-d="d"></label>';
-  if (k !== "tr") h += '<div class="tx-pd"><div class="tx-payee"><label class="fld"><span>Lehdar</span><input id="f-t" class="in" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore="true" placeholder="Boşsa kategori adı" value="' + esc(D.t) + '" data-d="t"></label><div class="sugg" id="sugg"></div></div>' + dateF + '</div>';
-  else h += dateF;
+  const dateF = '<div class="fld tx-date"><span>Tarih</span><button type="button" class="in dpick-btn" data-act="dp-open">' + (D.d ? (+D.d.slice(8)) + " " + C.TR_M[+D.d.slice(5, 7) - 1].slice(0, 3) + " " + D.d.slice(2, 4) : "Seç") + '</button></div>';
+  const dpH = D.dpOpen ? dpHtml() : "";
+  if (k !== "tr") h += '<div class="tx-pd"><div class="tx-payee"><label class="fld"><span>Lehdar</span><input id="f-t" class="in" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore="true" placeholder="Boşsa kategori adı" value="' + esc(D.t) + '" data-d="t"></label><div class="sugg" id="sugg"></div></div>' + dateF + '</div>' + dpH;
+  else h += dateF + dpH;
   h += '<label class="fld"><span>Not</span><input class="in" maxlength="120" value="' + esc(D.n) + '" data-d="n" placeholder="İsteğe bağlı"></label>';
   if (D._new) {
     h += '<div class="fld"><span>Tekrar</span><div class="seg" style="display:flex">' + [["one", "Tek sefer"], ["inst", "Taksit"], ["mon", "Abonelik"], ["reg", "Düzenli"]].map(([v, l]) => '<button style="flex:1" data-act="tx-rep" data-v="' + v + '" aria-pressed="' + (D.rep === v) + '">' + l + '</button>').join("") + '</div></div>';
@@ -1785,6 +1794,9 @@ document.addEventListener("click", e => {
         S.sel = null; render(); toast(n + " işlem silindi"); }); break; }
     case "tx-k": { const k = ds.v; if (k === D.k) break; D.k = k; D.cat = null; D.catOpen = false; if (k === "tr") { D.to = visibleAccs().find(x => x.id !== D.acc)?.id || null; } else if (!D.accTouched) D.acc = lastAccFor(k); renderTx(true); break; }
     case "tx-acc": D[ds.f] = ds.id; if (ds.f === "acc") D.accTouched = true; dlgIn.querySelectorAll('[data-act="tx-acc"][data-f="' + ds.f + '"]').forEach(b => b.setAttribute("aria-pressed", b.dataset.id === ds.id)); break;
+    case "dp-open": D.dpOpen = !D.dpOpen; D.dpV = D.d.slice(0, 7); renderTx(true); break;
+    case "dp-mv": { const [yy, mm] = D.dpV.split("-").map(Number); const x = new Date(yy, mm - 1 + Number(t.dataset.d), 1); D.dpV = x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0"); renderTx(true); break; }
+    case "dp-set": D.d = t.dataset.v; D.dpOpen = false; renderTx(true); renderPlanBox(); break;
     case "cat-open": D.catOpen = !D.catOpen; D.cq = ""; D.spPick = null; renderTx(true); if (D.catOpen) $("#cq")?.focus(); break;
     case "cat-list": if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); D.catOpen = true; D.cq = ""; D.spPick = null; renderTx(true); break;
     case "gt-add": if (!D[ds.g].includes(ds.v)) D[ds.g].push(ds.v); renderSettings(); break;
