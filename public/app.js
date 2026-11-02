@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.11.4";
+const APP_VERSION = "1.3.12.0";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -776,9 +776,11 @@ function cashPlan(opt) {
   let elde = C.r2(accs.reduce((s, a) => s + (bal[a.id] || 0), 0));
   const items = (meta().cash || {}).items || [], exd = (meta().cash || {}).exDebts || [], cols = debtCols().filter(([id]) => !exd.includes(id)), out = [];
   const sim = opt && opt.sim && opt.sim.items && opt.sim.items.length ? opt.sim : null;
-  for (let i = 0; i < 12; i++) {
-    const m = C.addM(cm, i), lines = [];
-    const skip = (meta().cash || {}).skip || {};
+  // Bir ayın satırları: düzenli kalemler, borç taksitleri, planlı işlemler ve
+  // (cari ya da ileriki aylarda) simülasyon tahminleri. Aynı mantık geçmiş
+  // aylar için de kullanılır, bu yüzden burada toplanmıştır.
+  const mkLines = m => {
+    const lines = [], skip = (meta().cash || {}).skip || {};
     items.forEach(it => { const day = it.rep === "once" ? Number((it.date || "").slice(8, 10)) : (it.day || 1);
       const am = it.rep === "once" ? (it.date || "").slice(0, 7) : m;
       if (!am || am !== m) return; const a = cashAmt(it, m); if (!a) return;
@@ -793,16 +795,31 @@ function cashPlan(opt) {
     // tamamını düşmek çift sayım olur.
     // on:true → çıkış toplamına ve ay sonu kalanına girer (tick yok, cashRow
     // tahmin satırı olarak çizer).
-    if (sim) sim.items.forEach(x => { const now = m === cm, amt = now ? x.rem.rem : x.est.avg;
+    if (sim && m >= cm) sim.items.forEach(x => { const now = m === cm, amt = now ? x.rem.rem : x.est.avg;
       if (!(amt > 0)) return;
       lines.push({ k: "-", n: x.label, a: C.r2(amt), day: 0, on: true, sim: true, cur: now, est: x.est.avg, spent: now ? x.rem.spent : 0, trend: x.est.trend, ref: "sim|" + x.key }); });
     // Gün 0 → plan/tahmin toplam satırları; listenin sonunda dururlar.
     lines.sort((a, b) => (a.k === b.k ? 0 : a.k === "+" ? -1 : 1) || (a.day || 99) - (b.day || 99));
-    const inc = lines.filter(l => l.k === "+" && l.on).reduce((s, l) => s + l.a, 0), exp = lines.filter(l => l.k === "-" && l.on).reduce((s, l) => s + l.a, 0);
+    return lines;
+  };
+  const incOf = ls => ls.filter(l => l.k === "+" && l.on).reduce((s, l) => s + l.a, 0);
+  const expOf = ls => ls.filter(l => l.k === "-" && l.on).reduce((s, l) => s + l.a, 0);
+  for (let i = 0; i < 12; i++) {
+    const m = C.addM(cm, i), lines = mkLines(m), inc = incOf(lines), exp = expOf(lines);
     const kalan = C.r2(elde + inc - exp);
     out.push({ m, elde, inc: C.r2(inc), exp: C.r2(exp), kalan, lines }); elde = kalan;
   }
-  return out;
+  // Geçmiş aylar: aynı satır mantığı, "elde" bugünkü bakiyeden geriye yürütülür
+  // (elde[önceki] = elde[sonraki] + çıkış - giriş). Böylece o ayda tiklenmemiş
+  // bir kalem geriye dönüp işaretlenebilir ve kalan anında güncellenir.
+  const back = Math.max(0, Math.min(12, (opt && opt.back) || 0)), past = [];
+  let e = out[0].elde;
+  for (let i = 1; i <= back; i++) {
+    const m = C.addM(cm, -i), lines = mkLines(m), inc = incOf(lines), exp = expOf(lines);
+    const ed = C.r2(e + exp - inc);
+    past.unshift({ m, elde: ed, inc: C.r2(inc), exp: C.r2(exp), kalan: e, lines }); e = ed;
+  }
+  return past.concat(out);
 }
 /* ---- Simülasyon: geçmiş aylardan tahmin ---- */
 const simSel = () => { const s = ((meta().cash || {}).sim || {}).sel; return Array.isArray(s) ? s.filter(x => x && (x.t === "cat" || x.t === "pay") && x.v) : []; };
@@ -852,18 +869,23 @@ function cashRow(l) {
 }
 
 
+const CASH_BACK = 6; // nakit akışında geriye bakılacak ay sayısı
 function vCash() {
   const sim = S.cashTab === "sim" ? simPlan() : null;
-  const pl = cashPlan({ sim }), items = (meta().cash || {}).items || [];
-  const mx = Math.max(1, ...pl.map(p => Math.abs(p.kalan)));
-  let si = Math.max(0, pl.findIndex(p => p.m === S.cashOpen)); const sel = pl[si];
-  const negP = pl.find(p => p.kalan < 0);
+  const pl = cashPlan({ sim, back: CASH_BACK }), items = (meta().cash || {}).items || [];
+  // Seçili ay hatırlanır; geçmisteki bir ay da seçili olabilir.
+  let si = pl.findIndex(p => p.m === S.cashOpen); if (si < 0) si = Math.max(0, pl.findIndex(p => p.m === CUR()));
+  const sel = pl[si];
+  // Grafik seçili aydan itibaren 12 ayı gösterir; geriye gidince pencere kayar.
+  const w0 = Math.max(0, Math.min(si, pl.length - 12)), win = pl.slice(w0, w0 + 12);
+  const mx = Math.max(1, ...win.map(p => Math.abs(p.kalan)));
+  const negP = pl.find(p => p.kalan < 0 && p.m >= CUR());
   const tab = (v, l) => { const on = (v === "sim") === !!sim; return '<button style="flex:1" role="tab" data-act="cash-tab" data-v="' + v + '" aria-selected="' + on + '" aria-pressed="' + on + '">' + l + '</button>'; };
   let h = '<div class="seg cash-tabseg" role="tablist" aria-label="Nakit akışı görünümü">' + tab("orig", "Orijinal") + tab("sim", "Simülasyon") + '</div>';
   if (sim) h += simCard(sim);
   if (negP) h += '<div class="cash-warn"><b>Dikkat</b><span>' + esc(mLabel(negP.m)) + ' sonunda bakiye eksiye düşüyor</span><b class="neg">' + f2(negP.kalan) + '</b></div>';
   // Barların rengi artık CSS'te (temasal --primary/--exp); burada yalnız yükseklik verilir.
-  h += '<div class="card cashbars' + (sim ? ' simbars' : '') + '">' + pl.map((p, i) => '<button class="cb' + (i === si ? ' sel' : '') + (p.kalan < 0 ? ' neg' : '') + '" data-act="cash-open" data-m="' + p.m + '" aria-label="' + mLabel(p.m) + ': ' + f2(p.kalan) + '"><i style="height:' + Math.max(3, Math.abs(p.kalan) / mx * 100).toFixed(1) + '%"></i><span class="cbv">' + f0(p.kalan) + '</span><span>' + C.TR_M[Number(p.m.slice(5)) - 1].slice(0, 3) + '</span></button>').join("") + '</div>';
+  h += '<div class="card cashbars' + (sim ? ' simbars' : '') + '">' + win.map((p, i) => '<button class="cb' + (w0 + i === si ? ' sel' : '') + (p.kalan < 0 ? ' neg' : '') + '" data-act="cash-open" data-m="' + p.m + '" aria-label="' + mLabel(p.m) + ': ' + f2(p.kalan) + '"><i style="height:' + Math.max(3, Math.abs(p.kalan) / mx * 100).toFixed(1) + '%"></i><span class="cbv">' + f0(p.kalan) + '</span><span>' + C.TR_M[Number(p.m.slice(5)) - 1].slice(0, 3) + '</span></button>').join("") + '</div>';
   if (sel) { const p = sel; const incL = p.lines.filter(l => l.k === "+"), expL = p.lines.filter(l => l.k === "-");
     const prev = pl[si - 1], next = pl[si + 1];
     h += '<div class="cash-nav"><button class="ib" data-act="cash-open" data-m="' + (prev ? prev.m : "") + '"' + (prev ? '' : ' disabled') + ' aria-label="Önceki ay">' + ICON.l + '</button><b>' + mLabel(p.m) + '</b><button class="ib" data-act="cash-open" data-m="' + (next ? next.m : "") + '"' + (next ? '' : ' disabled') + ' aria-label="Sonraki ay">' + ICON.r + '</button></div>';
@@ -871,7 +893,7 @@ function vCash() {
     h += '<div class="card mcard" id="cm-' + p.m + '"><div class="cash-cols"><div><div class="cash-colh">Gelirler</div><div class="crow elde-row"><span>Elde</span><span>' + f2(p.elde) + '</span></div>' + (incL.length ? incL.map(cashRow).join("") : '<div class="crow muted"><span>—</span></div>') + '</div><div><div class="cash-colh">Giderler</div>' + (expL.length ? expL.map(cashRow).join("") : '<div class="crow muted"><span>—</span></div>') + '</div></div></div>'; }
   h += '<div class="toolbar" style="margin-top:12px"><span style="flex:1"></span><button class="btn sm" data-act="ci-new" data-k="inc">+ Ekle</button></div>';
   if (items.length) h += '<div class="sec-h" style="margin-top:18px"><h2>Düzenli gelir ve giderler</h2></div><div class="card"><ul class="list">' + items.map(it => '<li><button class="set-row" data-act="ci-edit" data-id="' + esc(it.id) + '"><span class="cic" style="--c:' + (it.k === "inc" ? "var(--inc)" : "var(--exp)") + ';width:32px;height:32px">' + svgI(it.k === "inc" ? CI.coin : CI.bolt) + '</span><span class="grow">' + esc(it.name) + '<span class="small muted" style="display:block">' + (it.rep === "once" ? "Tek seferlik, " + it.date : "Her ay, " + dayTxt(it.day) + (it.mode === "var" ? ", değişken" : it.end ? ", " + mLabel(it.end) + "’e kadar" : "")) + '</span></span><span class="' + (it.k === "inc" ? "pos" : "") + '">' + f2(cashAmt(it, it.rep === "once" ? it.date.slice(0, 7) : (CUR() < it.start ? it.start : CUR()))) + '</span></button></li>').join("") + '</ul></div>';
-  return h + '<p class="small muted">Elde: kredi kartı dışındaki hesapların bugünkü bakiyesi. Bu ay için sadece henüz gerçekleşmemiş kalemler sayılır. Her ayın kalanı bir sonraki aya devreder; böylece ileriye dönük nakit akışınızın tamamını burada görürsünüz.</p>';
+  return h + '<p class="small muted">Elde: kredi kartı dışındaki hesapların bugünkü bakiyesi. Bu ay için sadece henüz gerçekleşmemiş kalemler sayılır. Her ayın kalanı bir sonraki aya devreder; böylece ileriye dönük nakit akışınızın tamamını burada görürsünüz. Soldaki okla geçmiş aylara dönüp orada tiklenmemiş kalem bırakıp bırakmadığınızı kontrol edebilirsiniz.</p>';
 }
 const BANKS = { ziraat: "ziraatbank.com.tr", garanti: "garantibbva.com.tr", akbank: "akbank.com", yapi: "yapikredi.com.tr", "yapı": "yapikredi.com.tr", kredi: "yapikredi.com.tr", isbank: "isbank.com.tr", "iş": "isbank.com.tr", vakif: "vakifbank.com.tr", "vakıf": "vakifbank.com.tr", halk: "halkbank.com.tr", qnb: "qnb.com.tr", finans: "qnb.com.tr", deniz: "denizbank.com", teb: "teb.com.tr", ing: "ing.com.tr", hsbc: "hsbc.com.tr", enpara: "enpara.com", papara: "papara.com", ininal: "ininal.com", paycell: "paycell.com.tr", "şeker": "sekerbank.com.tr", odeabank: "odeabank.com.tr", "kuveyt": "kuveytturk.com.tr", "albaraka": "albaraka.com.tr", "emlak": "emlakkatilim.com.tr", "fibabanka": "fibabanka.com.tr", "anadolu": "anadolubank.com.tr", "burgan": "burgan.com.tr", "alternatif": "alternatifbank.com.tr", "n kolay": "aktifbank.com.tr", "aktif": "aktifbank.com.tr" };
 const logoUrl = dom => "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(dom);
@@ -910,7 +932,7 @@ function buildShare() {
   const yr = Number(CUR().slice(0, 4)), sy = S.year; S.year = yr;
   const pg = (meta().share && meta().share.pages) || ["debt", "cash", "table"];
   let cashM = null;
-  if (pg.includes("cash")) { const so = S.cashOpen, stb = S.cashTab; S.cashTab = "orig"; cashM = {}; cashPlan().forEach(p => { S.cashOpen = p.m; cashM[p.m] = stripAct(vCash()).replace(/<div class="seg cash-tabseg"[\s\S]*?<\/div>/, ""); }); S.cashOpen = so; S.cashTab = stb; }
+  if (pg.includes("cash")) { const so = S.cashOpen, stb = S.cashTab; S.cashTab = "orig"; cashM = {}; cashPlan({ back: CASH_BACK }).forEach(p => { S.cashOpen = p.m; cashM[p.m] = stripAct(vCash()).replace(/<div class="seg cash-tabseg"[\s\S]*?<\/div>/, ""); }); S.cashOpen = so; S.cashTab = stb; }
   let tbls = null;
   if (pg.includes("table")) { const sel = meta().share && meta().share.tables; tbls = gtTabs().filter(t => !sel || sel.includes(t.id)).map(t => ({ id: t.id, name: t.name, html: stripAct(tCat(t.id)) })); }
   const g = { pages: pg, debt: pg.includes("debt") ? stripAct(tDebt(debtCols())) : "", cash: cashM ? Object.values(cashM)[0] || "" : "", cashM, tables: tbls, table: tbls && tbls[0] ? tbls[0].html : "", year: yr, ts: Date.now(), name: (S.user && S.user.name) || "" };
