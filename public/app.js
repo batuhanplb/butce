@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.12.2";
+const APP_VERSION = "1.3.12.3";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1083,7 +1083,8 @@ function extendRecs() {
   recs.forEach(r => { if (r.paused) return; const ev = r.ev || "m", base = ev === "w" ? r.last : r.last.slice(0, 8) + C.pad(r.day);
     const fut = []; Object.values(S.months).forEach(a => a.forEach(t => { if (t.grp === r.grp && t.d > tdy) fut.push(t.d); })); fut.sort();
     if (fut.length > 1) { cut[r.grp] = fut[0]; upd[r.grp] = fut[0]; return; }
-    if (fut.length || r.last > tdy) return;
+    if (fut.length) return;
+    if (r.last > tdy) { const d = r.last, m = d.slice(0, 7); (add[m] = add[m] || []).push({ ...r.tpl, id: C.rid(), d, ts: new Date(d + "T12:00").getTime(), grp: r.grp }); upd[r.grp] = d; return; }
     for (let i = 1; i < 400; i++) { const d = repDate(base, ev, i), m = d.slice(0, 7); (add[m] = add[m] || []).push({ ...r.tpl, id: C.rid(), d, ts: new Date(d + "T12:00").getTime(), grp: r.grp }); upd[r.grp] = d; if (d > tdy) break; } });
   if (!Object.keys(upd).length) return;
   if (Object.keys(cut).length) Object.keys(S.months).forEach(m => { const arr = S.months[m], keep = arr.filter(t => !(cut[t.grp] && t.d > cut[t.grp])); if (keep.length !== arr.length) saveMonth(m, keep); });
@@ -1370,7 +1371,7 @@ function renderSugg() {
   const box = $("#sugg"); if (!box || !D) return;
   const qy = (D.t || "").trim().toLocaleLowerCase("tr");
   if (qy.length < 1) { box.innerHTML = ""; return; }
-  const list = derived().payees.filter(p => p.k === D.k && p.t.toLocaleLowerCase("tr").includes(qy) && p.t.toLocaleLowerCase("tr") !== qy).slice(0, 5);
+  const list = derived().payees.filter(p => p.k === D.k && p.t.toLocaleLowerCase("tr").includes(qy)).sort((a, b) => (b.t.toLocaleLowerCase("tr").startsWith(qy) ? 1 : 0) - (a.t.toLocaleLowerCase("tr").startsWith(qy) ? 1 : 0)).slice(0, 5);
   const seen = new Set(list.map(p => p.t.toLocaleLowerCase("tr")));
   const cats = meta().categories.map(c => ({ id: c.id, l: catLabel(c.id, true) })).filter(c => c.l && !seen.has(c.l.toLocaleLowerCase("tr")) && c.l.toLocaleLowerCase("tr").includes(qy) && c.l.toLocaleLowerCase("tr") !== qy).slice(0, 8 - list.length);
   box.innerHTML = list.map((p, i) => '<button data-act="sugg" data-i="' + i + '" data-t="' + esc(p.t) + '"><b style="font-weight:500">' + esc(p.t) + '</b><span>' + esc(catLabel(p.cat)) + '</span></button>').join("") + cats.map(c => '<button data-act="sugg" data-cat="' + esc(c.id) + '" data-t="' + esc(c.l) + '"><b style="font-weight:500">' + esc(c.l) + '</b><span>Kategori</span></button>').join("");
@@ -1404,7 +1405,6 @@ function applyPayee() {
   const cat = p && p.cat ? p.cat : (meta().categories.slice().sort((a, b) => (a.type !== (D.k === "i" ? "I" : "E")) - (b.type !== (D.k === "i" ? "I" : "E"))).find(c => nz(catLabel(c.id)) === nz(q)) || {}).id;
   let ch = false;
   if (cat && cat !== D.cat && !(D.sp && D.sp.length) && D._new && !D.catTouched && !D.cat) { D.cat = cat; ch = true; }
-  if (p && p.acc && !D.accTouched && p.acc !== D.acc) { D.acc = p.acc; ch = true; }
   return ch;
 }
 function saveTx(more) {
@@ -1830,7 +1830,7 @@ document.addEventListener("click", e => {
     case "tx-day": D.d = C.ymd(new Date(Date.now() + Number(ds.v) * 864e5)); renderTx(true); break;
     case "tx-ev": D.ev = ds.v; D.plan = null; D.planEdited = false; renderTx(true); break;
     case "tx-rep": D.rep = ds.v; D.plan = null; D.planEdited = false; if (ds.v !== "one" && D.cnt < 2) D.cnt = 2; renderTx(true); break;
-    case "sugg": { if (ds.cat) { D.t = ds.t; D.cat = ds.cat; renderTx(true); setTimeout(() => $("#f-amt") && !$("#f-amt").value && $("#f-amt").focus(), 30); break; } const p = derived().payees.find(x => x.t === ds.t); if (p) { D.t = p.t; if (p.cat) D.cat = p.cat; if (p.acc && !D.accTouched) D.acc = p.acc; } renderTx(true); setTimeout(() => $("#f-amt") && !$("#f-amt").value && $("#f-amt").focus(), 30); break; }
+    case "sugg": { if (ds.cat) { D.t = ds.t; D.cat = ds.cat; renderTx(true); setTimeout(() => $("#f-amt") && !$("#f-amt").value && $("#f-amt").focus(), 30); break; } const p = derived().payees.find(x => x.t === ds.t); if (p) { D.t = p.t; if (p.cat) D.cat = p.cat; } renderTx(true); setTimeout(() => $("#f-amt") && !$("#f-amt").value && $("#f-amt").focus(), 30); break; }
     case "tx-save": saveTx(!!ds.more); break;
     case "sub-pause": { const g = D && D.grp; if (!g) break; if (dlg.open) dlg.close(); D = null; subPause(g); render(); break; }
     case "tx-del": if (D.grp) { const rd = 'style="background:var(--exp);color:#fff;border-color:var(--exp)"'; dlgIn.querySelector(".sh-ft").innerHTML = '<button class="btn ghost" data-act="tx-del-x">Vazgeç</button><button class="btn" ' + rd + ' data-act="tx-del-one">İşlemi sil</button><button class="btn" ' + rd + ' data-act="tx-del-rest">Gelecek işlemleri de sil</button>'; } else ask("Bu işlem silinsin mi?").then(v => v && deleteTx(false)); break;
@@ -2056,7 +2056,7 @@ document.addEventListener("pointermove", e => { if (!dragT) return; const dx = e
 document.addEventListener("pointerup", () => { if (dragT) { dragT.w.classList.remove("grabbing"); if (dragT.on) dragEnd = Date.now(); } dragT = null; });
 let tipEl = null, tipT = null;
 function showTip(r, x, y, sticky) { if (!tipEl) { tipEl = document.createElement("div"); tipEl.className = "ctip"; document.body.appendChild(tipEl); }
-  const t = r.dataset.tip; if (!t) return; const i = t.lastIndexOf(":"); tipEl.innerHTML = '<span>' + esc(t.slice(0, i)) + '</span><b>' + esc(t.slice(i + 1).trim()) + '</b>';
+  const t = r.dataset.tip; if (!t) return; const i = t.indexOf(":"); tipEl.innerHTML = '<span>' + esc(t.slice(0, i)) + '</span><b>' + esc(t.slice(i + 1).trim()) + '</b>';
   tipEl.style.display = "block"; const w = tipEl.offsetWidth, h = tipEl.offsetHeight, md = r.closest(".mod"); if (md) { const b = md.getBoundingClientRect(); x = b.left + b.width / 2; y = b.top + h + 4; } tipEl.style.left = Math.max(6, Math.min(innerWidth - w - 6, x - w / 2)) + "px"; tipEl.style.top = Math.max(6, y - h - 12) + "px";
   document.querySelectorAll(".br.hl").forEach(e => e.classList.remove("hl")); const br = r.nextElementSibling; if (br && br.classList.contains("br")) br.classList.add("hl");
   clearTimeout(tipT); if (sticky) tipT = setTimeout(hideTip, 2500); }
