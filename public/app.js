@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.12.1";
+const APP_VERSION = "1.3.12.2";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1283,10 +1283,10 @@ function renderTx(keep) {
   if (D._new || true) h += '<div class="seg" style="display:flex;margin-bottom:14px">' + [["e", "Gider"], ["i", "Gelir"], ["tr", "Transfer"]].map(([v, l]) => '<button style="flex:1" data-act="tx-k" data-v="' + v + '" aria-pressed="' + (k === v) + '">' + l + '</button>').join("") + '</div>';
   const accChips = (field, label) => '<div class="fld"><span>' + label + '</span><div class="scroll-x">' + accs.map(a => '<button class="chip" data-act="tx-acc" data-f="' + field + '" data-id="' + esc(a.id) + '" aria-pressed="' + (D[field] === a.id) + '"><i style="background:' + a.color + ';border-radius:2px"></i>' + esc(a.name) + '</button>').join("") + '</div></div>';
   if (k === "tr") { h += accChips("acc", "Kimden"); h += accChips("to", "Kime"); } else h += accChips("acc", "Hesap");
-  h += '<label class="fld"><span>Tutar</span><span class="amtwrap"><span class="cur">₺</span><input id="f-amt" class="in amt" inputmode="decimal" autocomplete="off" data-lpignore="true" data-1p-ignore="true" placeholder="0,00" value="' + esc(D.aStr) + '" data-d="aStr"></span></label><div id="e-amt"></div>';
+  h += '<label class="fld"><span>Tutar</span><span class="amtwrap"><span class="cur">₺</span><input id="f-amt" type="search" enterkeyhint="done" class="in amt" inputmode="decimal" autocomplete="off" data-lpignore="true" data-1p-ignore="true" placeholder="0,00" value="' + esc(D.aStr) + '" data-d="aStr"></span></label><div id="e-amt"></div>';
   if (k !== "tr") {
     h += '<div class="fld"><span>Kategori</span><div class="tx-category">';
-    if (D.catOpen) h += '<div class="catsel cat-search">' + ICON.search + '<input id="cq" role="combobox" aria-label="Kategori ara" aria-expanded="true" aria-controls="catlist" aria-autocomplete="list" autocomplete="off" placeholder="Kategori ara…" value="' + esc(D.cq || "") + '"><button class="ib" data-act="cat-open" aria-label="Kategori listesini kapat">' + ICON.x + '</button></div>' + catPanel(k);
+    if (D.catOpen) h += '<div class="catsel cat-search">' + ICON.search + '<input id="cq" type="search" role="combobox" aria-label="Kategori ara" aria-expanded="true" aria-controls="catlist" aria-autocomplete="list" autocomplete="off" placeholder="Kategori ara…" value="' + esc(D.cq || "") + '"><button class="ib" data-act="cat-open" aria-label="Kategori listesini kapat">' + ICON.x + '</button></div>' + catPanel(k);
     else h += '<button class="catsel" data-act="cat-open" aria-expanded="false" aria-haspopup="listbox"><i style="background:' + catColor(D.cat) + '"></i><span>' + esc(D.cat ? catLabel(D.cat) : "Kategori seç") + '</span><span class="cat-chevron" data-act="cat-list" role="button" aria-label="Listeyi aç" style="padding:8px;margin:-8px">' + ICON.r + '</span></button>';
     h += '</div>';
     h += '<div style="margin-top:8px"><button class="btn sm ghost" data-act="sp-toggle">' + (D.sp && D.sp.length ? "Bölmeyi kaldır" : "Birden fazla kategoriye böl") + '</button></div>';
@@ -1295,7 +1295,7 @@ function renderTx(keep) {
   }
   const dateF = '<div class="fld tx-date"><span>Tarih</span><button type="button" class="in dpick-btn" data-act="dp-open">' + (D.d ? (+D.d.slice(8)) + " " + C.TR_M[+D.d.slice(5, 7) - 1].slice(0, 3) + " " + D.d.slice(2, 4) : "Seç") + '</button></div>';
   const dpH = D.dpOpen ? dpHtml() : "";
-  if (k !== "tr") h += '<div class="tx-pd"><div class="tx-payee"><label class="fld"><span>Lehdar</span><input id="f-t" class="in" autocomplete="off" data-lpignore="true" data-1p-ignore="true" placeholder="Boşsa kategori adı" value="' + esc(D.t) + '" data-d="t"></label><div class="sugg" id="sugg"></div></div>' + dateF + '</div>' + dpH;
+  if (k !== "tr") h += '<div class="tx-pd"><div class="tx-payee"><label class="fld"><span>Lehdar</span><input id="f-t" type="search" class="in" autocomplete="off" data-lpignore="true" data-1p-ignore="true" placeholder="Boşsa kategori adı" value="' + esc(D.t) + '" data-d="t"></label><div class="sugg" id="sugg"></div></div>' + dateF + '</div>' + dpH;
   else h += dateF + dpH;
   h += '<label class="fld"><span>Not</span><input class="in" maxlength="120" value="' + esc(D.n) + '" data-d="n" placeholder="İsteğe bağlı"></label>';
   if (D._new) {
@@ -1357,9 +1357,9 @@ function renderPlanBox() {
 function spBox() {
   if (!D || !D.sp || !D.sp.length) return "";
   const a = C.parseAmt(D.aStr) || 0, sum = D.sp.reduce((s, x) => s + (C.parseAmt(x.a) || 0), 0), diff = C.r2(a - sum);
-  return '<div class="spwrap">' + D.sp.map((x, i) => '<div class="sprow"><button class="spcat" data-act="sp-cat" data-i="' + i + '"><i style="background:' + catColor(x.cat) + '"></i>' + esc(x.cat ? catLabel(x.cat, true) : "Kategori seç") + '</button><input class="in" inputmode="decimal" data-sa="' + i + '" value="' + esc(x.a) + '" placeholder="0,00"><button class="ib" data-act="sp-rm" data-i="' + i + '" aria-label="Sil">' + ICON.x + '</button></div>').join("") +
+  return '<div class="spwrap">' + D.sp.map((x, i) => '<div class="sprow"><button class="spcat" data-act="sp-cat" data-i="' + i + '"><i style="background:' + catColor(x.cat) + '"></i>' + esc(x.cat ? catLabel(x.cat, true) : "Kategori seç") + '</button><input class="in" inputmode="decimal" data-sa="' + i + '" type="search" value="' + esc(x.a) + '" placeholder="0,00"><button class="ib" data-act="sp-rm" data-i="' + i + '" aria-label="Sil">' + ICON.x + '</button></div>').join("") +
     '<div class="sprow spf"><button class="btn sm ghost" data-act="sp-add">Satır ekle</button><span class="small ' + (Math.abs(diff) < 0.005 ? "muted" : "neg") + '">' + (Math.abs(diff) < 0.005 ? "Dağıtım tam" : (diff > 0 ? "Kalan " + f2(diff) : "Fazla " + f2(-diff))) + '</span></div></div>' +
-    (D.spPick != null ? '<div class="catsel cat-search" style="margin-top:6px">' + ICON.search + '<input id="spq" autocomplete="off" placeholder="Kategori ara…" value="' + esc(D.spq || "") + '"></div><div class="tx-catlist" id="spcatlist" role="listbox" aria-label="Bölme kategorileri">' + catList(D.k, D.spq || "") + '</div>' : '');
+    (D.spPick != null ? '<div class="catsel cat-search" style="margin-top:6px">' + ICON.search + '<input id="spq" type="search" autocomplete="off" placeholder="Kategori ara…" value="' + esc(D.spq || "") + '"></div><div class="tx-catlist" id="spcatlist" role="listbox" aria-label="Bölme kategorileri">' + catList(D.k, D.spq || "") + '</div>' : '');
 }
 // Tutarı n satıra eşit böler; artan kuruşlar 1. satıra gider.
 function splitEven(a, n) { const c = Math.round((a || 0) * 100); if (!(n > 0) || !(c > 0)) return [...Array(n)].map(() => ""); const b = Math.floor(c / n), r = c - b * n; return [...Array(n)].map((_, i) => amtIn((b + (i === 0 ? r : 0)) / 100)); }
