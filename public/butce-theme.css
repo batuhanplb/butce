@@ -720,3 +720,14 @@ html[data-theme=softdark]{
 .bootlg img{ width:100%; height:100%; display:block; filter:grayscale(1) opacity(.35); }
 .bootfill{ position:absolute; inset:0; background:url(/icons/icon-192.png) center/cover; animation:bootfill 1.4s ease-in-out infinite; }
 @keyframes bootfill{ 0%{ clip-path:inset(100% 0 0 0); } 70%,100%{ clip-path:inset(0 0 0 0); } }
+
+/* 1.3.11.2 işlem formu: tarih seçici + eşit kutular */
+.tx-pd{align-items:end}.tx-pd .fld .in,.tx-pd .dpick-btn{height:44px;box-sizing:border-box}
+.dpick-btn{width:100%;text-align:left;font-size:13px;padding:0 8px;white-space:nowrap;overflow:hidden;cursor:pointer;color:var(--ink)}
+.dpick{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;margin:-6px 0 12px}
+.dp-q{display:flex;gap:6px;margin-bottom:6px}.dp-q button{flex:1;padding:6px;border-radius:6px;background:var(--sunk);border:0;font:inherit;font-size:13px;color:var(--ink)}
+.dp-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:14px}
+.dp-w,.dp-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}.dp-w span{font-size:11px;color:var(--muted)}
+.dp-g button{aspect-ratio:1;max-height:38px;border:0;border-radius:6px;background:none;font:inherit;font-size:13px;color:var(--ink)}
+.dp-g button.td{outline:1px solid var(--line)}.dp-g button.on{background:var(--primary,var(--tr));color:var(--bg)}
+.tx-form .in.amt{font-size:24.7px}.tx-form .amtwrap .cur{font-size:19px}.tx-form .amtwrap .in.amt{padding-top:7px;padding-bottom:7px}
