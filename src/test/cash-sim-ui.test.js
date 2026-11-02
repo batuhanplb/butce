@@ -163,3 +163,73 @@ describe("Nakit akışı simülasyon sekmesi", () => {
     dom.window.close();
   });
 });
+
+// ---- Nakit akışında geçmiş aylar ------------------------------------------
+// Nakit akışı ileriye dönük 12 ayı gösterir; ama bir ayda tiklenmemiş bir kalem
+// kaldıysa kullanıcı geriye dönüp onu işaretleyebilmeli. Bu yüzden cari ayda
+// sol ok aktiftir ve geçmiş aylar da aynı satır/tick mantığıyla çizilir.
+function seedRecurring() {
+  return {
+    meta: {
+      accounts: [{ id: "nakit", name: "Nakit", type: "nakit", color: "#0091ea", start: 100000, order: 0 }],
+      categories: [{ id: "c-mutfak", name: "Mutfak", parent: null, type: "E", color: "#93a083" }],
+      cash: {
+        items: [{ id: "i-kira", k: "exp", name: "Kira", rep: "monthly", day: 1, start: ym(-3), end: null, mode: "until", amts: [{ from: ym(-3), a: 5000 }] }],
+        sim: { sel: [] },
+      },
+    },
+    months: {},
+    debts: {},
+  };
+}
+const labelOf = m => C.TR_M[Number(m.slice(5)) - 1] + " " + m.slice(0, 4);
+
+describe("Nakit akışında geçmiş aylar", () => {
+  it("cari ayda sol ok aktiftir ve önceki aya götürür", async () => {
+    const dom = boot(seedRecurring());
+    const w = dom.window;
+    await flush();
+    const prev = [...w.document.querySelectorAll('.cash-nav [data-act="cash-open"]')][0];
+    expect(prev.disabled).toBe(false);
+    expect(prev.getAttribute("data-m")).toBe(ym(-1));
+    click(w, prev);
+    await flush();
+    expect(txt(w.document.querySelector(".cash-nav b"))).toBe(labelOf(ym(-1)));
+    // Grafik penceresi seçili aydan itibaren 12 ay kalır.
+    expect(w.document.querySelectorAll(".cashbars .cb").length).toBe(12);
+    dom.window.close();
+  });
+
+  it("geçmiş aydaki kalem tiklenir ve meta.cash.items[].skip'e yazılır", async () => {
+    const dom = boot(seedRecurring());
+    const w = dom.window;
+    await flush();
+    click(w, [...w.document.querySelectorAll('.cash-nav [data-act="cash-open"]')][0]);
+    await flush();
+    const ref = '.crow [data-act="cash-tick"][data-ref$="|' + ym(-1) + '"]';
+    const row = w.document.querySelector(ref);
+    expect(row).not.toBeNull();
+    expect(row.closest(".crow").className).toBe("crow"); // tikli değil
+    click(w, row);
+    await flush();
+    expect(w.__store.meta.cash.items[0].skip).toEqual([ym(-1)]);
+    expect(w.document.querySelector(ref).closest(".crow").className).toBe("crow off");
+    dom.window.close();
+  });
+
+  it("geçmiş ayın ay sonu kalanı, sonraki ayın 'elde' değeriyle aynıdır", async () => {
+    const dom = boot(seedRecurring());
+    const w = dom.window;
+    await flush();
+    const kal = () => txt([...w.document.querySelectorAll(".cash-sum > div")][2]);
+    const elde = () => txt(w.document.querySelector(".crow.elde-row"));
+    click(w, [...w.document.querySelectorAll('.cash-nav [data-act="cash-open"]')][0]);
+    await flush();
+    const pastKalan = kal();
+    click(w, [...w.document.querySelectorAll('.cash-nav [data-act="cash-open"]')].slice(-1)[0]);
+    await flush();
+    expect(txt(w.document.querySelector(".cash-nav b"))).toBe(labelOf(ym(0)));
+    expect(elde()).toContain(pastKalan.replace(/.*kalan\s*/, ""));
+    dom.window.close();
+  });
+});
