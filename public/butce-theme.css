@@ -714,3 +714,9 @@ html[data-theme=softdark]{
 .report-list{display:flex;flex-direction:column}.report-list .setl{justify-content:space-between}
 .report-list .setl:after{content:"›";color:var(--muted)}
 .selbar{max-height:35vh;overflow:auto}.selbar .selinfo{min-width:120px}
+
+/* Yükleme logosu 1.3.11.1 */
+.bootlg{ position:relative; width:72px; height:72px; border-radius:20px; overflow:hidden; }
+.bootlg img{ width:100%; height:100%; display:block; filter:grayscale(1) opacity(.35); }
+.bootfill{ position:absolute; inset:0; background:url(/icons/icon-192.png) center/cover; animation:bootfill 1.4s ease-in-out infinite; }
+@keyframes bootfill{ 0%{ clip-path:inset(100% 0 0 0); } 70%,100%{ clip-path:inset(0 0 0 0); } }
