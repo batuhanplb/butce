@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.12.0";
+const APP_VERSION = "1.3.12.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1227,7 +1227,7 @@ function rememberScroll() { (S._sy = S._sy || {})[S.view] = window.scrollY; }
 function restoreScroll(v) { const y = (S._sy || {})[v] || 0; window.scrollTo(0, y); requestAnimationFrame(() => window.scrollTo(0, y)); }
 function suppressAutofill(host) {
   host.querySelectorAll('input:not([type="file"]):not([type="checkbox"]):not([type="color"]),textarea').forEach((x, i) => {
-    x.setAttribute("autocomplete", x.type === "search" ? "off" : "butce-" + Math.random().toString(36).slice(2, 7)); x.setAttribute("autocorrect", "off"); x.setAttribute("autocapitalize", "off"); x.spellcheck = false;
+    x.setAttribute("autocomplete", "off"); if (!x.dataset.ro && !x.readOnly && x.type !== "date" && x.type !== "month") { x.dataset.ro = "1"; x.readOnly = true; x.addEventListener("pointerdown", () => { x.readOnly = false; }, { once: true }); x.addEventListener("focus", () => { x.readOnly = false; }, { once: true }); } x.setAttribute("autocorrect", "off"); x.setAttribute("autocapitalize", "off"); x.spellcheck = false;
     x.setAttribute("data-lpignore", "true"); x.setAttribute("data-1p-ignore", "true"); x.setAttribute("data-form-type", "other");
     x.name = "bx" + Math.random().toString(36).slice(2, 8); x.id || x.setAttribute("aria-autocomplete", "none"); x.removeAttribute("list");
   });
@@ -1283,7 +1283,7 @@ function renderTx(keep) {
   if (D._new || true) h += '<div class="seg" style="display:flex;margin-bottom:14px">' + [["e", "Gider"], ["i", "Gelir"], ["tr", "Transfer"]].map(([v, l]) => '<button style="flex:1" data-act="tx-k" data-v="' + v + '" aria-pressed="' + (k === v) + '">' + l + '</button>').join("") + '</div>';
   const accChips = (field, label) => '<div class="fld"><span>' + label + '</span><div class="scroll-x">' + accs.map(a => '<button class="chip" data-act="tx-acc" data-f="' + field + '" data-id="' + esc(a.id) + '" aria-pressed="' + (D[field] === a.id) + '"><i style="background:' + a.color + ';border-radius:2px"></i>' + esc(a.name) + '</button>').join("") + '</div></div>';
   if (k === "tr") { h += accChips("acc", "Kimden"); h += accChips("to", "Kime"); } else h += accChips("acc", "Hesap");
-  h += '<label class="fld"><span>Tutar</span><span class="amtwrap"><span class="cur">₺</span><input id="f-amt" class="in amt" inputmode="decimal" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore="true" placeholder="0,00" value="' + esc(D.aStr) + '" data-d="aStr"></span></label><div id="e-amt"></div>';
+  h += '<label class="fld"><span>Tutar</span><span class="amtwrap"><span class="cur">₺</span><input id="f-amt" class="in amt" inputmode="decimal" autocomplete="off" data-lpignore="true" data-1p-ignore="true" placeholder="0,00" value="' + esc(D.aStr) + '" data-d="aStr"></span></label><div id="e-amt"></div>';
   if (k !== "tr") {
     h += '<div class="fld"><span>Kategori</span><div class="tx-category">';
     if (D.catOpen) h += '<div class="catsel cat-search">' + ICON.search + '<input id="cq" role="combobox" aria-label="Kategori ara" aria-expanded="true" aria-controls="catlist" aria-autocomplete="list" autocomplete="off" placeholder="Kategori ara…" value="' + esc(D.cq || "") + '"><button class="ib" data-act="cat-open" aria-label="Kategori listesini kapat">' + ICON.x + '</button></div>' + catPanel(k);
@@ -1295,7 +1295,7 @@ function renderTx(keep) {
   }
   const dateF = '<div class="fld tx-date"><span>Tarih</span><button type="button" class="in dpick-btn" data-act="dp-open">' + (D.d ? (+D.d.slice(8)) + " " + C.TR_M[+D.d.slice(5, 7) - 1].slice(0, 3) + " " + D.d.slice(2, 4) : "Seç") + '</button></div>';
   const dpH = D.dpOpen ? dpHtml() : "";
-  if (k !== "tr") h += '<div class="tx-pd"><div class="tx-payee"><label class="fld"><span>Lehdar</span><input id="f-t" class="in" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore="true" placeholder="Boşsa kategori adı" value="' + esc(D.t) + '" data-d="t"></label><div class="sugg" id="sugg"></div></div>' + dateF + '</div>' + dpH;
+  if (k !== "tr") h += '<div class="tx-pd"><div class="tx-payee"><label class="fld"><span>Lehdar</span><input id="f-t" class="in" autocomplete="off" data-lpignore="true" data-1p-ignore="true" placeholder="Boşsa kategori adı" value="' + esc(D.t) + '" data-d="t"></label><div class="sugg" id="sugg"></div></div>' + dateF + '</div>' + dpH;
   else h += dateF + dpH;
   h += '<label class="fld"><span>Not</span><input class="in" maxlength="120" value="' + esc(D.n) + '" data-d="n" placeholder="İsteğe bağlı"></label>';
   if (D._new) {
