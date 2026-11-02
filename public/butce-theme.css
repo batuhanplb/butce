@@ -731,3 +731,11 @@ html[data-theme=softdark]{
 .dp-g button{aspect-ratio:1;max-height:38px;border:0;border-radius:6px;background:none;font:inherit;font-size:13px;color:var(--ink)}
 .dp-g button.td{outline:1px solid var(--line)}.dp-g button.on{background:var(--primary,var(--tr));color:var(--bg)}
 .tx-form .in.amt{font-size:24.7px}.tx-form .amtwrap .cur{font-size:19px}.tx-form .amtwrap .in.amt{padding-top:7px;padding-bottom:7px}
+
+/* 1.3.11.4 kompakt tarih seçici + eşit kutular */
+.tx-pd{align-items:start}.tx-pd .fld,.tx-pd .tx-payee .fld{margin:0 0 10px}
+.tx-pd .fld .in,.tx-pd .dpick-btn{height:42px;line-height:20px;padding-top:0;padding-bottom:0;font-size:13px}
+.dpick{padding:6px;margin:-4px 0 10px;max-width:300px}
+.dp-q{gap:4px;margin-bottom:4px}.dp-q button{padding:4px;font-size:12px}
+.dp-h{margin-bottom:2px;font-size:13px}.dp-h .ib{width:28px;height:28px}
+.dp-g button{aspect-ratio:auto;height:30px;max-height:none;font-size:12px;cursor:pointer}.dp-w span{font-size:10px}

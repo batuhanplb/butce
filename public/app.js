@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.11.3";
+const APP_VERSION = "1.3.11.4";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1795,8 +1795,8 @@ document.addEventListener("click", e => {
     case "tx-k": { const k = ds.v; if (k === D.k) break; D.k = k; D.cat = null; D.catOpen = false; if (k === "tr") { D.to = visibleAccs().find(x => x.id !== D.acc)?.id || null; } else if (!D.accTouched) D.acc = lastAccFor(k); renderTx(true); break; }
     case "tx-acc": D[ds.f] = ds.id; if (ds.f === "acc") D.accTouched = true; dlgIn.querySelectorAll('[data-act="tx-acc"][data-f="' + ds.f + '"]').forEach(b => b.setAttribute("aria-pressed", b.dataset.id === ds.id)); break;
     case "dp-open": D.dpOpen = !D.dpOpen; D.dpV = D.d.slice(0, 7); renderTx(true); break;
-    case "dp-mv": { const [yy, mm] = D.dpV.split("-").map(Number); const x = new Date(yy, mm - 1 + Number(t.dataset.d), 1); D.dpV = x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0"); renderTx(true); break; }
-    case "dp-set": D.d = t.dataset.v; D.dpOpen = false; renderTx(true); renderPlanBox(); break;
+    case "dp-mv": { const [yy, mm] = D.dpV.split("-").map(Number); const x = new Date(yy, mm - 1 + Number(ds.d), 1); D.dpV = x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0"); renderTx(true); break; }
+    case "dp-set": D.d = ds.v; D.dpOpen = false; renderTx(true); renderPlanBox(); break;
     case "cat-open": D.catOpen = !D.catOpen; D.cq = ""; D.spPick = null; renderTx(true); if (D.catOpen) $("#cq")?.focus(); break;
     case "cat-list": if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); D.catOpen = true; D.cq = ""; D.spPick = null; renderTx(true); break;
     case "gt-add": if (!D[ds.g].includes(ds.v)) D[ds.g].push(ds.v); renderSettings(); break;
