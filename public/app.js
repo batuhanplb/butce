@@ -1731,7 +1731,7 @@ function download(name, text, type) {
 document.addEventListener("click", e => {
   const b = e.target.closest('[data-act]');
   if (b && ['nav', 'acc-tx', 'stmt', 'mod-go', 'cat-tx', 'pay-tx', 'gt-open', 'set-nav'].includes(b.dataset.act)) rememberScroll();
-  if (!e.target.closest('.account-pop') && b?.dataset.act !== 'acc-menu') document.querySelector('.account-pop')?.remove();
+  if (b?.dataset.act !== 'acc-menu') document.querySelector('.account-pop')?.remove();
 }, true);
 document.addEventListener("keydown", e => { if (e.key === 'Escape') document.querySelector('.account-pop')?.remove(); });
 document.addEventListener("click", e => {
