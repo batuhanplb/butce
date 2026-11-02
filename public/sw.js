@@ -1,4 +1,4 @@
-const V = "butce-v68";
+const V = "butce-v69";
 const SHELL = ["/", "/index.html", "/butce-theme.css?v=36", "/app.js", "/core.js", "/transaction-input.js", "/transaction-bulk.js", "/cash-income.js", "/statement.js", "/cash-sim.js", "/cloud-store.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith("butce-") && k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

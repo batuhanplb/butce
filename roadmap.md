@@ -100,3 +100,10 @@
 - [x] Dönemler: Son 30 gün, Bu ay, Geçen ay, Diğer ▾, Tümü
 - [x] Mobil alt menü 6 sekme + ayırıcılar; Tanımlar ayarlara taşındı
 - [x] Ayarlar liste düzeni, 4 tema, yedekle/geri yükle, uygulama/bildirim/nakit kutuları kaldırıldı
+
+# Nakit akışında geçmiş aylar (1.3.12.0)
+- [x] `cashPlan()` artık `opt.back` ile geçmiş ay üretiyor: aynı satır mantığı (düzenli kalem, borç taksiti, planlı işlem) geçmiş aylar için de çalışıyor; "elde" bugünkü bakiyeden geriye yürütülüyor (`elde[önceki] = elde[sonraki] + çıkış − giriş`), böylece ay sonu kalanı sonraki ayın "elde"siyle birebir bağlanıyor.
+- [x] Cari ayda sol ok aktifleşti (eskiden `prev` tanımsız olduğu için pasifti): geriye 6 ay dönülebiliyor, orada tiklenmemiş kalem görünüp işaretlenebiliyor; tick `meta.cash.items[].skip`'e yazılıyor ve kalan anında güncelleniyor.
+- [x] Grafik penceresi seçili aydan itibaren 12 ay kayıyor; "Dikkat, eksiye düşüyor" uyarısı yalnızca cari ve ileri aylar için veriliyor; simülasyon tahminleri geçmiş aylara eklenmiyor (o ayın harcaması zaten gerçekleşti).
+- [x] Paylaşılan sayfada da geçmiş aylar gezilebiliyor (`cashPlan({ back: CASH_BACK })`).
+- [x] `src/test/cash-sim-ui.test.js`: sol okun aktifliği + önceki aya geçiş, geçmiş aydaki kalemin tiklenip `skip`'e yazılması, geçmiş ayın geriye yürütülmüş elde/çıkış/kalan değerleri (5 → 8 test).
