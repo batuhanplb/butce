@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.11.0";
+const APP_VERSION = "1.3.11.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -226,11 +226,12 @@ function fixSep() {
 }
 
 /* ============ boot ============ */
+function bootLogo() { return '<div class="boot"><div class="bootlg" role="img" aria-label="Yükleniyor"><img src="/icons/icon-192.png" alt=""><span class="bootfill"></span></div></div>'; }
 async function boot() {
   const mock = new URLSearchParams(location.search).has("mock") || window.__MOCK_SEED__;
   const shareTok = new URLSearchParams(location.search).get("s");
   if (shareTok) {
-    $("#root").innerHTML = '<div class="boot">Yükleniyor…</div>';
+    $("#root").innerHTML = '' + bootLogo() + '';
     try { const st = mock ? mockStore(() => { }) : await loadCloudStore(() => { }); S.share = await st.getShare(shareTok); S.shTab = "debt"; renderShare(); }
     catch (e) { console.error(e); $("#root").innerHTML = '<div class="boot">Paylaşılan sayfa açılamadı.</div>'; }
     return;
@@ -282,7 +283,7 @@ function render() {
     root.innerHTML = landingHtml();
     return;
   }
-  if (!S.loaded.months || !S.loaded.meta) { root.innerHTML = '<div class="boot">Veriler yükleniyor…</div>'; return; }
+  if (!S.loaded.months || !S.loaded.meta) { root.innerHTML = bootLogo(); return; }
   const titles = { home: "Anasayfa", tx: "İşlemler", debt: "Borç takvimi", cash: "Nakit akışı", table: "Gider", pie: "Dağılım", inv: "Yatırımlar", acc: "Hesaplar", cat: "Kategoriler", pay: "Lehdarlar", subs: "Abonelikler" };
   const ctl = "";
   const body = { home: vHome, tx: vTx, debt: vDebt, cash: vCash, table: vTable, pie: vPie, inv: vInv, acc: vAcc, cat: vCat, pay: vPay, subs: vSubs }[S.view]();
