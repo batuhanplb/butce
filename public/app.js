@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.12.3";
+const APP_VERSION = "1.3.12.4";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1315,7 +1315,7 @@ function renderTx(keep) {
   else h += '<button class="btn ghost" data-act="tx-save" data-more="1">Kaydet ve yeni</button>';
   h += '<button class="btn" data-act="tx-save">Kaydet</button></div>';
   openSheet(h, keep);
-  if (k !== "tr") renderSugg();
+  if (k !== "tr" && !D.suggOff) renderSugg();
   renderPlanBox();
   const gw = $("#glwrap"); if (gw) { const me = gw.querySelector(".gl-me"), pv = me && me.previousElementSibling; const top = (pv || me); if (top) gw.scrollTop = top.offsetTop; }
 }
@@ -1754,6 +1754,7 @@ document.addEventListener("click", e => {
   const b = e.target.closest('[data-act]');
   if (b && ['nav', 'acc-tx', 'stmt', 'mod-go', 'cat-tx', 'pay-tx', 'gt-open', 'set-nav'].includes(b.dataset.act)) rememberScroll();
   if (b?.dataset.act !== 'acc-menu') document.querySelector('.account-pop')?.remove();
+  const sg = document.getElementById("sugg"); if (sg && sg.innerHTML && !e.target.closest('#f-t')) { sg.innerHTML = ""; if (D) D.suggOff = true; }
 }, true);
 document.addEventListener("keydown", e => { if (e.key === 'Escape') document.querySelector('.account-pop')?.remove(); });
 document.addEventListener("click", e => {
@@ -1993,7 +1994,7 @@ document.addEventListener("input", e => {
   if (!D) return;
   if (t.dataset.d === "aStr" || t.dataset.sa != null || t.dataset.pa != null || t.dataset.si != null || t.dataset.ga != null || t.dataset.ci === "a" || t.dataset.ci === "rangeAmount" || t.dataset.ci === "pa" || t.dataset.incomeMonth != null || t.id === "p-a" || t.dataset.a === "start" || t.dataset.a === "limit" || (t.dataset.num === "amt" && t.dataset.f !== "rate")) formatAmountField(t);
   if (t.id === "p-date") { const g = t.value.replace(/\D/g, "").slice(0, 8); t.value = g.length > 4 ? g.slice(0, 2) + "." + g.slice(2, 4) + "." + g.slice(4) : g.length > 2 ? g.slice(0, 2) + "." + g.slice(2) : g; return; }
-  if (t.dataset.d) { D[t.dataset.d] = t.dataset.d === "cnt" ? parseInt(t.value) || 0 : t.value; if (t.dataset.d === "t") renderSugg(); if (["aStr", "cnt"].includes(t.dataset.d)) renderPlanBox(); if (t.dataset.d === "cnt" || (t.dataset.d === "aStr" && D.rep !== "one")) { /* preview updates on next render */ } }
+  if (t.dataset.d) { D[t.dataset.d] = t.dataset.d === "cnt" ? parseInt(t.value) || 0 : t.value; if (t.dataset.d === "t") { D.suggOff = false; renderSugg(); } if (["aStr", "cnt"].includes(t.dataset.d)) renderPlanBox(); if (t.dataset.d === "cnt" || (t.dataset.d === "aStr" && D.rep !== "one")) { /* preview updates on next render */ } }
   if (t.dataset.f) { const k = t.dataset.num; let v = t.value; if (k === "amt") { v = v.trim() === "" ? null : C.parseAmt(v); if (v !== null && isNaN(v)) return; } else if (k === "int") v = v === "" ? null : parseInt(v); D[t.dataset.f] = v; }
   if (t.dataset.simq) { D.q = D.q || {}; D.q[t.dataset.simq] = t.value; const sl = $("#siml-" + t.dataset.simq); if (sl) sl.innerHTML = simPickList(t.dataset.simq, t.value); return; }
   if (D && (t.dataset.gtq || t.dataset.gtpq)) { const g = t.dataset.gtq || t.dataset.gtpq, kd = t.dataset.gtq ? "c" : "p"; $("#gtl-" + kd + "-" + g).innerHTML = gtList(kd, g, t.value); return; }
