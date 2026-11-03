@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.13.0";
+const APP_VERSION = "1.3.13.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -511,7 +511,7 @@ function vHome() {
   M.ratio = () => { const r = ti ? te / ti * 100 : 0, sav = ti - te;
     return mod(svgI(CI.coin), "Gelir-gider dengesi", null, '<div class="mod-n"><b class="' + (sav < 0 ? "neg" : "pos") + '">' + f0(sav) + '</b><span class="muted small">bu ay kalan</span></div><div class="ratiobar"><i style="width:' + Math.min(100, r).toFixed(1) + '%;background:' + (r > 100 ? "var(--exp)" : "var(--primary)") + '"></i></div><div class="legend" style="justify-content:space-between"><span>Gider gelirin %' + nfp.format(r).replace(/,00$/, "") + '\'i</span><span>' + f0(te) + ' / ' + f0(ti) + '</span></div>'); };
   M.sub = () => { const tdy = today(), recs = meta().recs || [], sr = subList().filter(x => recs.some(r => x.grps.includes(r.grp) && !r.paused) || x.items.some(t => t.d > tdy)).map(x => { const pd = x.items.filter(t => t.d <= tdy), l = pd[pd.length - 1]; if (!l) return null; const lm = l.d.slice(0, 7); return [x, [l], subNet(x, t => t.d.slice(0, 7) === lm && t.d <= tdy)]; }).filter(Boolean), tot = sr.reduce((s, r) => s + r[2], 0);
-    return mod(svgI(CI.swap), "Abonelikler", "subs", '<div class="mod-n tr"><b>' + f0(tot) + '</b></div>' + (sr.length ? '<div class="klist">' + sr.slice(0, 20).map(([x, a]) => '<button class="krow subrow" data-act="edit-tx" data-id="' + esc(a[0].id) + '" data-m="' + m + '"><span class="subnm">' + subIco(x, 18) + '<b>' + esc(x.name) + '</b></span><span class="r"><b>' + f0(sr.find(r => r[0] === x)[2]) + '</b></span></button>').join("") + '</div>' : '<div class="empty">Abonelik yok.</div>')); };
+    return mod(svgI(CI.swap), "Abonelikler", "subs", '<div class="mod-n tr"><b>' + f0(tot) + '</b></div>' + (sr.length ? '<div class="klist">' + sr.slice(0, 20).map(([x, a]) => '<button class="krow subrow" data-act="edit-tx" data-id="' + esc(a[0].id) + '" data-m="' + a[0].d.slice(0, 7) + '"><span class="subnm">' + subIco(x, 18) + '<b>' + esc(x.name) + '</b></span><span class="r"><b>' + f0(sr.find(r => r[0] === x)[2]) + '</b></span></button>').join("") + '</div>' : '<div class="empty">Abonelik yok.</div>')); };
   M.tips = () => { const tips = [];
     const pl = cashPlan(), neg = pl.find(p => p.kalan < 0);
     if (neg) tips.push(["warn", "Nakit eksiye düşüyor", mLabel(neg.m) + " sonunda " + f2(neg.kalan) + ". Gelir ekleyin ya da gideri öne alın.", "cash"]);
@@ -1100,6 +1100,8 @@ function tDebt(list) {
 function dayTxt(n) { n = n || 1; const o = n % 10, t = Math.floor(n / 10); const sfx = o ? { 1: "i", 2: "si", 3: "ü", 4: "ü", 5: "i", 6: "sı", 7: "si", 8: "i", 9: "u" }[o] : { 1: "u", 2: "si", 3: "u" }[t]; return "ayın " + n + "'" + sfx; }
 function extendRecs() {
   let recs = meta().recs || []; const tdy = today(); if (!recs.length) return;
+  const old = recs.filter(r => !r.nogen && r.tpl && Object.keys(r.tpl).join() === "a,k,n,t,to,acc,cat");
+  if (old.length) { const gs = new Set(old.map(r => r.grp)); Object.keys(S.months).forEach(m => { const arr = S.months[m], keep = arr.filter(t => !(gs.has(t.grp) && t.ts === new Date(t.d + "T12:00").getTime())); if (keep.length !== arr.length) { S.months[m] = keep; saveMonth(m, keep); } }); saveMetaChange(mm => { (mm.recs || []).forEach(r => { if (gs.has(r.grp)) r.nogen = true; }); }); recs = meta().recs || []; }
   const add = {}, upd = {}, cut = {}, seen = {}, drop = new Set();
   recs.slice().sort((a, b) => a.last.localeCompare(b.last)).forEach(r => { const k = String((r.tpl && r.tpl.t) || r.grp).toLocaleLowerCase("tr"); if (seen[k]) drop.add(r.grp); else seen[k] = 1; });
   if (drop.size) { Object.keys(S.months).forEach(m => { const arr = S.months[m], keep = arr.filter(t => !(drop.has(t.grp) && t.d > tdy)); if (keep.length !== arr.length) { S.months[m] = keep; saveMonth(m, keep); } }); saveMetaChange(mm => { mm.recs = (mm.recs || []).filter(r => !drop.has(r.grp)); }); recs = recs.filter(r => !drop.has(r.grp)); }
