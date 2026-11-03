@@ -1754,6 +1754,7 @@ document.addEventListener("click", e => {
   const b = e.target.closest('[data-act]');
   if (b && ['nav', 'acc-tx', 'stmt', 'mod-go', 'cat-tx', 'pay-tx', 'gt-open', 'set-nav'].includes(b.dataset.act)) rememberScroll();
   if (b?.dataset.act !== 'acc-menu') document.querySelector('.account-pop')?.remove();
+  const sg = document.getElementById("sugg"); if (sg && sg.innerHTML && !e.target.closest('#f-t')) { sg.innerHTML = ""; if (D) D.suggOff = true; }
 }, true);
 document.addEventListener("keydown", e => { if (e.key === 'Escape') document.querySelector('.account-pop')?.remove(); });
 document.addEventListener("click", e => {
