@@ -117,8 +117,14 @@ export async function cloudStore(onUser: (u: User, err?: string) => void, toast?
       if (JSON.stringify(merged) !== JSON.stringify(cache.months[id] || [])) { cache.months[id] = clone(merged); saveCache(); emit(); }
       return;
     }
+    if (coll === "meta") {
+      const r = await supabase.from("user_docs").select("data").eq("user_id", uid!).eq("coll", "meta").eq("doc_id", id).maybeSingle();
+      if (r.error) throw errOf(r.error);
+      if (r.data?.data) data = mergeMeta((base as Record<string, unknown>).__meta, data, r.data.data);
+    }
     const { error } = await supabase.from("user_docs").upsert({ user_id: uid!, coll, doc_id: id, data: data as never, updated_at: new Date().toISOString() });
     if (error) throw errOf(error);
+    if (coll === "meta") { (base as Record<string, unknown>).__meta = clone(data); saveBase(); if (JSON.stringify(data) !== JSON.stringify(cache.meta)) { cache.meta = clone(data); saveCache(); emit(); } }
   };
   const del = async (coll: string, id: string) => {
     const { error } = await supabase.from("user_docs").delete().eq("user_id", uid!).eq("coll", coll).eq("doc_id", id);
@@ -178,7 +184,7 @@ export async function cloudStore(onUser: (u: User, err?: string) => void, toast?
     }
     cache = { meta: null, months: {}, debts: {} };
     base = {};
-    rows.forEach((r) => { if (r.coll === "tx") base[r.doc_id] = clone(((r.data as { items?: unknown[] }) || {}).items || []); });
+    rows.forEach((r) => { if (r.coll === "tx") base[r.doc_id] = clone(((r.data as { items?: unknown[] }) || {}).items || []); if (r.coll === "meta") (base as Record<string, unknown>).__meta = clone(r.data); });
     saveBase();
     rows.forEach((r) => applyLocal(r.coll, r.doc_id, r.data));
     Object.values(outbox).forEach((p) => applyLocal(p.coll, p.id, p.data));
@@ -188,6 +194,7 @@ export async function cloudStore(onUser: (u: User, err?: string) => void, toast?
   const store = {
     kind: "cloud",
     pending() { return Object.keys(outbox).length; },
+    flush() { return flush(); },
     user: null as User,
     async signIn() {
       // Native (Capacitor) app: popups don't work in the WebView, so run the
