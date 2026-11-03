@@ -743,3 +743,8 @@ html[data-theme=softdark]{
 /* 1.3.12.2 search-type inputs */
 input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none;appearance:none;display:none}
 input[type=search].in{-webkit-appearance:none;appearance:none}
+
+/* 1.3.13.2 abonelik logoları: hepsi aynı yuvarlak kalıp, tutarlı ve daha büyük */
+.cic.logo{ width:var(--sico,32px)!important; height:var(--sico,32px)!important; border-radius:50%!important; padding:0!important; background:#fff!important; overflow:hidden!important; display:grid!important; place-items:center!important; flex:none!important }
+.cic.logo img{ width:100%!important; height:100%!important; object-fit:cover!important; border-radius:50%!important; display:block }
+.krow .subnm .cic.logo{ margin-right:2px }
