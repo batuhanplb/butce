@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.13.2";
+const APP_VERSION = "1.3.13.3";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -594,7 +594,7 @@ function subFromPay() {
 }
 function vSubs() {
   const tdy = today(), cm = CUR(), L = subList().map(x => { const nx = x.items.find(t => t.d >= tdy), cur = x.items.filter(t => t.d.slice(0, 7) === cm), ref = nx || x.items[x.items.length - 1];
-    return { ...x, nx, ref, mon: (cur.length ? cur.reduce((s, t) => s + t.a, 0) : (nx ? nx.a : (x.items[x.items.length - 1] || {}).a || 0)) - x.inc.filter(t => t.d.slice(0, 7) === (cur.length || !nx ? cm : nx.d.slice(0, 7))).reduce((s, t) => s + t.a, 0), paid: x.items.filter(t => t.d <= tdy).length, active: (!!nx || x.open) && !(meta().recs || []).some(r => x.grps.includes(r.grp) && r.paused) || (meta().recs || []).some(r => x.grps.includes(r.grp) && r.paused) }; });
+    return { ...x, nx, ref, mon: (cur.length ? cur.reduce((s, t) => s + t.a, 0) : (nx ? nx.a : (x.items[x.items.length - 1] || {}).a || 0)) - x.inc.filter(t => t.d.slice(0, 7) === (cur.length || !nx ? cm : nx.d.slice(0, 7))).reduce((s, t) => s + t.a, 0), paid: x.items.filter(t => t.d <= tdy).length, active: (!!nx || x.open) && !(meta().recs || []).some(r => x.grps.includes(r.grp) && r.paused) }; });
   const act = L.filter(x => x.active).sort((a, b) => b.mon - a.mon), old = L.filter(x => !x.active), mt = act.reduce((s, x) => s + x.mon, 0);
   const spent = L.reduce((s, x) => s + x.items.filter(t => t.d <= tdy && t.d.slice(0, 4) === tdy.slice(0, 4)).reduce((q, t) => q + t.a, 0), 0);
   const nxt = act.filter(x => x.nx).sort((a, b) => a.nx.d.localeCompare(b.nx.d))[0];
@@ -602,7 +602,7 @@ function vSubs() {
   const row = x => '<li><button class="set-row" data-act="edit-tx" data-id="' + esc(x.ref.id) + '" data-m="' + x.ref.d.slice(0, 7) + '">' + (subLogo(x.name) ? subIco(x, 42) : '<span class="cic" style="--c:' + catColor(x.cat) + ';width:32px;height:32px">' + catIcon(x.cat) + '</span>') + '<span class="grow">' + esc(x.name) + '<span class="small muted" style="display:block">' + ((meta().recs || []).some(r => r.grp === x.grp && r.paused) ? "Duraklatıldı" : x.nx ? "Sonraki: " + dLabel(x.nx.d) : "Son: " + dLabel(x.ref.d)) + ' · ' + x.paid + ' ödeme yapıldı</span></span><span><b>' + f2(x.mon || x.ref.a) + '</b><span class="small muted" style="display:block;text-align:right">/ay</span></span></button></li>';
   h += '<div class="sec-h" style="margin-top:18px"><h2>Aktif abonelikler (' + act.length + ')</h2><span style="display:flex;gap:6px"><button class="btn sm ghost" data-act="sub-pay">Lehdardan ekle</button><button class="btn sm" data-act="add-sub">Abonelik ekle</button></span></div>';
   h += act.length ? '<div class="card"><ul class="list">' + act.map(row).join("") + '</ul></div>' : '<div class="card empty">Aktif abonelik yok. Yeni işlemde "Abonelik" seçerek ekleyebilirsin.</div>';
-  if (old.length) h += '<div class="sec-h" style="margin-top:18px"><h2>Biten abonelikler</h2></div><div class="card"><ul class="list">' + old.map(row).join("") + '</ul></div>';
+  if (old.length) h += '<div class="sec-h" style="margin-top:18px"><h2>Pasif abonelikler (' + old.length + ')</h2></div><div class="card"><ul class="list">' + old.map(row).join("") + '</ul></div>';
   return h;
 }
 function vTx() {
@@ -1332,7 +1332,7 @@ function renderTx(keep) {
     if (D.rep !== "one" && !((D.rep === "mon" || D.rep === "reg") && D.open)) h += '<label class="fld"><span>' + (D.rep === "inst" ? "Taksit sayısı" : "Kaç kez") + '</span><input class="in" type="number" min="2" max="60" value="' + D.cnt + '" data-d="cnt"></label>';
     if (D.rep !== "one") h += '<div id="planlist"></div>';
   } else if (D.ins) h += '<p class="small muted">Taksit ' + esc(D.ins) + '. Bu değişiklik sadece bu taksiti etkiler.</p>';
-  else if (D.grp) { { const rc = recOfGrp(D.grp); h += '<div class="chips" style="align-items:center;margin-bottom:8px"><span class="small muted" style="flex:1">' + (D.reg ? "Düzenli işlem" : "Abonelik") + (rc && rc.paused ? " · duraklatıldı" : "") + '</span>' + (rc ? (rc.nogen ? '' : '<button class="btn sm ghost" data-act="sub-pause">' + (rc.paused ? "Devam ettir" : "Aboneliği duraklat") + '</button>') : '') + (D.reg ? '' : '<button class="btn sm ghost" data-act="sub-del">Abonelikten çıkar</button>') + '</div>'; }
+  else if (D.grp) { { const rc = recOfGrp(D.grp); h += '<div class="chips" style="align-items:center;margin-bottom:8px"><span class="small muted" style="flex:1">' + (D.reg ? "Düzenli işlem" : "Abonelik") + (rc && rc.paused ? " · duraklatıldı" : "") + '</span>' + (rc ? '<button class="btn sm ghost" data-act="sub-pause">' + (rc.paused ? "Devam ettir" : "Aboneliği duraklat") + '</button>' : '') + '</div>'; }
     if (D.gl && D.gl.length) { const tdy = today(), all = D.gl.concat([{ me: 1, d: D.d, a: C.parseAmt(D.aStr) }]).sort((a, b) => a.d.localeCompare(b.d));
       h += '<div class="fld"><span>Tüm ödemeler</span></div><div class="schedwrap" id="glwrap" style="max-height:232px;overflow-y:auto;position:relative"><table class="sched"><tbody>' + all.map(p => p.me ? '<tr class="gl-me"><td class="muted small" style="white-space:nowrap;width:1%">Bu işlem</td><td colspan="2" class="small"><b>' + dLabel(p.d) + ' · ' + f2(p.a) + '</b></td></tr>' : (i => '<tr' + (p.d < tdy ? ' style="opacity:.7"' : '') + '><td class="muted small" style="white-space:nowrap;width:1%">' + (p.d < tdy ? "Geçmiş" : "Gelecek") + '</td><td><input type="date" data-gd="' + i + '" value="' + p.d + '" style="text-align:left"></td><td><input inputmode="decimal" data-ga="' + i + '" value="' + esc(amtIn(p.a)) + '"></td></tr>')(D.gl.indexOf(p))).join("") + '</tbody></table></div>'; } }
   h += '<div id="e-gen"></div></div><div class="sh-ft">';
