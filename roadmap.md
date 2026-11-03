@@ -107,3 +107,9 @@
 - [x] Grafik penceresi seçili aydan itibaren 12 ay kayıyor; "Dikkat, eksiye düşüyor" uyarısı yalnızca cari ve ileri aylar için veriliyor; simülasyon tahminleri geçmiş aylara eklenmiyor (o ayın harcaması zaten gerçekleşti).
 - [x] Paylaşılan sayfada da geçmiş aylar gezilebiliyor (`cashPlan({ back: CASH_BACK })`).
 - [x] `src/test/cash-sim-ui.test.js`: sol okun aktifliği + önceki aya geçiş, geçmiş aydaki kalemin tiklenip `skip`'e yazılması, geçmiş ayın geriye yürütülmüş elde/çıkış/kalan değerleri (5 → 8 test).
+
+# Abonelik logoları (1.3.13.2)
+- [x] `subIco()` artık `--sico` değişkeni ve `subico` sınıfı üretiyor; `original-index.html` içindeki `@media (max-width:899px){ .cic{width/height:32px!important} }` kuralı satır içi boyutu geçersiz kıldığı için abonelik logoları hep 32px kalıyordu.
+- [x] `butce-theme.css` sonuna eklenen blokla her logo tek tip: `border-radius:50%`, `padding:0`, `object-fit:cover` — logo beyaz kutuyu artık tamamen dolduruyor, daire/karesi karışık durmuyor.
+- [x] Boyutlar: anasayfa abonelik modülü 32 → 36px, abonelikler sayfası 32 → 42px, hesap listesi 34px korunuyor (`--sico:34px`).
+- [x] Sürüm 1.3.13.2, `butce-theme.css?v=37`, `sw.js` butce-v76.
