@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { mergeMeta } from "@/cloud-store/entry";
+import { describe, it, expect, vi } from "vitest";
+vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({}) }));
+vi.mock("@lovable.dev/cloud-auth-js", () => ({ createLovableAuth: () => ({}) }));
+globalThis.__SB_URL__ = "x"; globalThis.__SB_KEY__ = "y";
+const { mergeMeta } = await import("../cloud-store/entry");
 
 describe("mergeMeta", () => {
   it("eski cihazın logo kaydı başka cihazda eklenen nakit gelirini silmez", () => {
