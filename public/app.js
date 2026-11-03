@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.14.0";
+const APP_VERSION = "1.3.14.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -1906,7 +1906,7 @@ document.addEventListener("click", e => {
     case "expand": S.expanded.has(ds.k) ? S.expanded.delete(ds.k) : S.expanded.add(ds.k); render(); break;
     case "onlymine": S.onlyMine = ds.v === "1"; render(); break;
     case "settings": openSettings(); break;
-    case "app-reload": (async () => { toast("Yenileniyor…"); try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister().catch(() => {}))); const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith("butce-")).map(k => caches.delete(k))); } catch (e) {} setTimeout(() => location.reload(), 300); })(); break;
+    case "app-reload": (async () => { toast("Kayıtlar gönderiliyor…"); try { if (S.store && S.store.flush) await Promise.race([S.store.flush(), new Promise(r => setTimeout(r, 8000))]); if (S.store && S.store.pending && S.store.pending()) { toast("Gönderilmemiş kayıt var, telefonda saklanıyor; tekrar deneyin."); return; } } catch (e) {} toast("Yenileniyor…"); try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister().catch(() => {}))); const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith("butce-")).map(k => caches.delete(k))); } catch (e) {} setTimeout(() => location.reload(), 300); })(); break;
     case "acct": openSettings(); break;
     case "set-back": openSettings(D.back === "reps" && D.view === "rep" ? "reps" : "main"); break;
     case "set-nav": closeSheet(true); S.stmt = null; S.sel = null; S.bub = null; S.view = ds.v; S.catF = null; S.payF = null; if (location.hash.slice(1) !== ds.v) location.hash = ds.v; render(); window.scrollTo(0, 0); break;
