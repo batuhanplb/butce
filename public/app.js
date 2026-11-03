@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.13.0";
+const APP_VERSION = "1.3.13.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -510,8 +510,8 @@ function vHome() {
     return mod(svgI(CI.bag), "En büyük harcamalar", "tx", big.length ? '<div class="klist">' + big.map(t => '<button class="krow" data-act="edit-tx" data-id="' + esc(t.id) + '" data-m="' + t.d.slice(0, 7) + '"><span><b>' + esc(t.t || catLabel(t.cat, true)) + '</b><span class="muted small">' + dLabel(t.d) + '</span></span><span class="r"><b>' + f0(t.a) + '</b></span></button>').join("") + '</div>' : '<div class="empty">Bu ay gider yok.</div>'); };
   M.ratio = () => { const r = ti ? te / ti * 100 : 0, sav = ti - te;
     return mod(svgI(CI.coin), "Gelir-gider dengesi", null, '<div class="mod-n"><b class="' + (sav < 0 ? "neg" : "pos") + '">' + f0(sav) + '</b><span class="muted small">bu ay kalan</span></div><div class="ratiobar"><i style="width:' + Math.min(100, r).toFixed(1) + '%;background:' + (r > 100 ? "var(--exp)" : "var(--primary)") + '"></i></div><div class="legend" style="justify-content:space-between"><span>Gider gelirin %' + nfp.format(r).replace(/,00$/, "") + '\'i</span><span>' + f0(te) + ' / ' + f0(ti) + '</span></div>'); };
-  M.sub = () => { const sr = subList().map(x => [x, x.items.filter(t => t.d.slice(0, 7) === m && t.d <= today())]).filter(([, a]) => a.length), tot = sr.reduce((s, [, a]) => s + a.reduce((q, t) => q + t.a, 0), 0);
-    return mod(svgI(CI.swap), "Abonelikler", "subs", '<div class="mod-n tr"><b>' + f0(tot) + '</b></div>' + (sr.length ? '<div class="klist">' + sr.slice(0, 20).map(([x, a]) => '<button class="krow subrow" data-act="edit-tx" data-id="' + esc(a[0].id) + '" data-m="' + m + '"><span class="subnm">' + subIco(x, 18) + '<b>' + esc(x.name) + '</b></span><span class="r"><b>' + f0(a.reduce((q, t) => q + t.a, 0)) + '</b></span></button>').join("") + '</div>' : '<div class="empty">Abonelik yok.</div>')); };
+  M.sub = () => { const tdy = today(), recs = meta().recs || [], sr = subList().filter(x => recs.some(r => x.grps.includes(r.grp) && !r.paused) || x.items.some(t => t.d > tdy)).map(x => { const pd = x.items.filter(t => t.d <= tdy), l = pd[pd.length - 1]; if (!l) return null; const lm = l.d.slice(0, 7); return [x, [l], subNet(x, t => t.d.slice(0, 7) === lm && t.d <= tdy)]; }).filter(Boolean), tot = sr.reduce((s, r) => s + r[2], 0);
+    return mod(svgI(CI.swap), "Abonelikler", "subs", '<div class="mod-n tr"><b>' + f0(tot) + '</b></div>' + (sr.length ? '<div class="klist">' + sr.slice(0, 20).map(([x, a]) => '<button class="krow subrow" data-act="edit-tx" data-id="' + esc(a[0].id) + '" data-m="' + a[0].d.slice(0, 7) + '"><span class="subnm">' + subIco(x, 18) + '<b>' + esc(x.name) + '</b></span><span class="r"><b>' + f0(sr.find(r => r[0] === x)[2]) + '</b></span></button>').join("") + '</div>' : '<div class="empty">Abonelik yok.</div>')); };
   M.tips = () => { const tips = [];
     const pl = cashPlan(), neg = pl.find(p => p.kalan < 0);
     if (neg) tips.push(["warn", "Nakit eksiye düşüyor", mLabel(neg.m) + " sonunda " + f2(neg.kalan) + ". Gelir ekleyin ya da gideri öne alın.", "cash"]);
@@ -569,12 +569,17 @@ function subIco(x, sz) { const u = subLogo(x.name); return u ? '<span class="cic
 function subList() {
   const g = {}, gn = {}; derived().all.filter(t => t.k === "e" && t.grp && !t.ins && !t.reg).forEach(t => { const nm = (t.t || catLabel(t.cat, true)).trim().toLocaleLowerCase("tr"); const key = gn[t.grp] || (gn[t.grp] = nm); (g[key] = g[key] || []).push(t); });
   const recs = meta().recs || [];
-  return Object.values(g).map(items => { items.sort((a, b) => a.d.localeCompare(b.d)); const l = items[items.length - 1], grps = [...new Set(items.map(t => t.grp))]; return { grp: l.grp, grps, items, name: l.t || catLabel(l.cat, true), cat: l.cat, open: recs.some(r => grps.includes(r.grp)) }; });
+  return Object.values(g).map(items => { items.sort((a, b) => a.d.localeCompare(b.d)); const l = items[items.length - 1], grps = [...new Set(items.map(t => t.grp))]; const name = l.t || catLabel(l.cat, true), nk = name.trim().toLocaleLowerCase("tr"), inc = derived().all.filter(t => t.k === "i" && (t.t || "").trim().toLocaleLowerCase("tr") === nk); return { grp: l.grp, grps, items, inc, name, cat: l.cat, open: recs.some(r => grps.includes(r.grp) && !r.paused) }; });
 }
+const subNet = (x, f) => x.items.filter(f).reduce((s, t) => s + t.a, 0) - x.inc.filter(f).reduce((s, t) => s + t.a, 0);
+function recOfGrp(grp) { const x = subList().find(s => s.grps.includes(grp)), recs = meta().recs || []; return x ? recs.find(r => x.grps.includes(r.grp)) : recs.find(r => r.grp === grp); }
+function subUnlink(grp) { const x = subList().find(s => s.grps.includes(grp)), gs = new Set(x ? x.grps : [grp]), tdy = today();
+  Object.keys(S.months).forEach(m => { const arr = S.months[m]; if (!arr.some(t => gs.has(t.grp))) return; const nw = arr.filter(t => !(gs.has(t.grp) && t.d > tdy)).map(t => { if (!gs.has(t.grp)) return t; const o = { ...t }; delete o.grp; return o; }); S.months[m] = nw; saveMonth(m, nw); });
+  saveMetaChange(mm => { mm.recs = (mm.recs || []).filter(r => !gs.has(r.grp)); }); toast("Abonelikten çıkarıldı, işlemler duruyor"); }
 function subFromPay() {
   const tdy = today(), have = new Set(subList().map(x => x.name.toLocaleLowerCase("tr"))), L = allPayees("e").filter(p => !have.has(p.t.toLocaleLowerCase("tr")));
   const o = document.createElement("div"); o.className = "askov";
-  o.innerHTML = '<div class="askbox" style="max-width:520px;width:94vw;text-align:left"><p><b>Lehdardan abonelik ekle</b><span class="small muted" style="display:block">Seçtiğin lehdarın geçmiş işlemleri aboneliğe bağlanır, sonraki ödeme otomatik oluşur.</span></p><ul class="list" style="max-height:55vh;overflow:auto;margin:6px 0">' + (L.length ? L.map((p, i) => '<li><button class="set-row" data-i="' + i + '" style="display:flex;justify-content:space-between;gap:8px;width:100%"><span>' + esc(p.t) + '</span><span class="small muted">' + p.n + ' işlem</span></button></li>').join("") : '<li class="empty">Lehdar yok.</li>') + '</ul><button class="btn ghost" data-c="1">Kapat</button></div>';
+  o.innerHTML = '<div class="askbox" style="max-width:520px;width:94vw;text-align:left"><p><b>Lehdardan abonelik ekle</b><span class="small muted" style="display:block">Seçtiğin lehdarın sadece geçmiş işlemleri aboneliğe bağlanır; yeni işlem oluşturulmaz.</span></p><ul class="list" style="max-height:55vh;overflow:auto;margin:6px 0">' + (L.length ? L.map((p, i) => '<li><button class="set-row" data-i="' + i + '" style="display:flex;justify-content:space-between;gap:8px;width:100%"><span>' + esc(p.t) + '</span><span class="small muted">' + p.n + ' işlem</span></button></li>').join("") : '<li class="empty">Lehdar yok.</li>') + '</ul><button class="btn ghost" data-c="1">Kapat</button></div>';
   let pd = null; o.addEventListener("pointerdown", e => { pd = e.target; });
   o.addEventListener("click", e => { e.stopPropagation(); const b = e.target.closest("button"); if ((b && b.dataset.c) || (e.target === o && pd === o)) { o.remove(); return; }
     if (!b || b.dataset.i == null) return; const p = L[+b.dataset.i], key = p.t.toLocaleLowerCase("tr"), grp = C.rid();
@@ -583,13 +588,13 @@ function subFromPay() {
     const ids = new Set(txs.map(t => t.id)), last = txs[txs.length - 1];
     new Set(txs.map(t => t.d.slice(0, 7))).forEach(m => { const arr = monthItems(m).map(t => ids.has(t.id) ? { ...t, grp } : t); S.months[m] = arr; saveMonth(m, arr); });
     const tpl = { a: last.a, k: "e", n: "", t: last.t, to: null, acc: last.acc, cat: last.cat };
-    saveMetaChange(mm => { mm.recs = mm.recs || []; mm.recs.push({ ev: "m", day: Number(last.d.slice(8, 10)), grp, tpl, last: last.d }); });
+    saveMetaChange(mm => { mm.recs = mm.recs || []; mm.recs.push({ ev: "m", day: Number(last.d.slice(8, 10)), grp, tpl, last: last.d, nogen: true }); });
     o.remove(); toast(p.t + " abonelik olarak eklendi (" + txs.length + " işlem)"); setTimeout(() => { extendRecs(); render(); }, 80); });
   document.body.appendChild(o);
 }
 function vSubs() {
   const tdy = today(), cm = CUR(), L = subList().map(x => { const nx = x.items.find(t => t.d >= tdy), cur = x.items.filter(t => t.d.slice(0, 7) === cm), ref = nx || x.items[x.items.length - 1];
-    return { ...x, nx, ref, mon: cur.length ? cur.reduce((s, t) => s + t.a, 0) : (nx ? nx.a : 0), paid: x.items.filter(t => t.d <= tdy).length, active: !!nx || x.open }; });
+    return { ...x, nx, ref, mon: (cur.length ? cur.reduce((s, t) => s + t.a, 0) : (nx ? nx.a : (x.items[x.items.length - 1] || {}).a || 0)) - x.inc.filter(t => t.d.slice(0, 7) === (cur.length || !nx ? cm : nx.d.slice(0, 7))).reduce((s, t) => s + t.a, 0), paid: x.items.filter(t => t.d <= tdy).length, active: (!!nx || x.open) && !(meta().recs || []).some(r => x.grps.includes(r.grp) && r.paused) || (meta().recs || []).some(r => x.grps.includes(r.grp) && r.paused) }; });
   const act = L.filter(x => x.active).sort((a, b) => b.mon - a.mon), old = L.filter(x => !x.active), mt = act.reduce((s, x) => s + x.mon, 0);
   const spent = L.reduce((s, x) => s + x.items.filter(t => t.d <= tdy && t.d.slice(0, 4) === tdy.slice(0, 4)).reduce((q, t) => q + t.a, 0), 0);
   const nxt = act.filter(x => x.nx).sort((a, b) => a.nx.d.localeCompare(b.nx.d))[0];
@@ -1095,10 +1100,12 @@ function tDebt(list) {
 function dayTxt(n) { n = n || 1; const o = n % 10, t = Math.floor(n / 10); const sfx = o ? { 1: "i", 2: "si", 3: "ü", 4: "ü", 5: "i", 6: "sı", 7: "si", 8: "i", 9: "u" }[o] : { 1: "u", 2: "si", 3: "u" }[t]; return "ayın " + n + "'" + sfx; }
 function extendRecs() {
   let recs = meta().recs || []; const tdy = today(); if (!recs.length) return;
+  const old = recs.filter(r => !r.nogen && r.tpl && Object.keys(r.tpl).join() === "a,k,n,t,to,acc,cat");
+  if (old.length) { const gs = new Set(old.map(r => r.grp)); Object.keys(S.months).forEach(m => { const arr = S.months[m], keep = arr.filter(t => !(gs.has(t.grp) && t.ts === new Date(t.d + "T12:00").getTime())); if (keep.length !== arr.length) { S.months[m] = keep; saveMonth(m, keep); } }); saveMetaChange(mm => { (mm.recs || []).forEach(r => { if (gs.has(r.grp)) r.nogen = true; }); }); recs = meta().recs || []; }
   const add = {}, upd = {}, cut = {}, seen = {}, drop = new Set();
   recs.slice().sort((a, b) => a.last.localeCompare(b.last)).forEach(r => { const k = String((r.tpl && r.tpl.t) || r.grp).toLocaleLowerCase("tr"); if (seen[k]) drop.add(r.grp); else seen[k] = 1; });
   if (drop.size) { Object.keys(S.months).forEach(m => { const arr = S.months[m], keep = arr.filter(t => !(drop.has(t.grp) && t.d > tdy)); if (keep.length !== arr.length) { S.months[m] = keep; saveMonth(m, keep); } }); saveMetaChange(mm => { mm.recs = (mm.recs || []).filter(r => !drop.has(r.grp)); }); recs = recs.filter(r => !drop.has(r.grp)); }
-  recs.forEach(r => { if (r.paused) return; const ev = r.ev || "m", base = ev === "w" ? r.last : r.last.slice(0, 8) + C.pad(r.day);
+  recs.forEach(r => { if (r.paused || r.nogen) return; const ev = r.ev || "m", base = ev === "w" ? r.last : r.last.slice(0, 8) + C.pad(r.day);
     const fut = []; Object.values(S.months).forEach(a => a.forEach(t => { if (t.grp === r.grp && t.d > tdy) fut.push(t.d); })); fut.sort();
     if (fut.length > 1) { cut[r.grp] = fut[0]; upd[r.grp] = fut[0]; return; }
     if (fut.length) return;
@@ -1276,7 +1283,7 @@ function recentCats(k) { const seen = [], all = derived().all.filter(t => t.k ==
 function openTx(opt = {}) {
   if (opt.id) {
     const t = monthItems(opt.m).find(x => x.id === opt.id); if (!t) return;
-    D = { ...clone(t), aStr: amtIn(t.a), sp: (t.sp || []).map(x => ({ cat: x.cat, a: amtIn(x.a) })), _m: opt.m, _origD: t.d, _new: false, rep: "one", cnt: 2, catOpen: false, accTouched: true };
+    D = { ...clone(t), aStr: amtIn(t.a), sp: (t.sp || []).map(x => ({ cat: x.cat, a: amtIn(x.a) })), _m: opt.m, _origD: t.d, _new: false, rep: "one", cnt: 2, catOpen: false, accTouched: true, suggOff: true };
     if (t.grp && !t.ins) D.gl = derived().all.filter(x => x.grp === t.grp && x.id !== t.id).sort((a, b) => a.d.localeCompare(b.d)).map(x => ({ id: x.id, m: x.d.slice(0, 7), d: x.d, a: x.a, o: x.d + "|" + x.a }));
   } else {
     const k = opt.k || "e";
@@ -1325,7 +1332,7 @@ function renderTx(keep) {
     if (D.rep !== "one" && !((D.rep === "mon" || D.rep === "reg") && D.open)) h += '<label class="fld"><span>' + (D.rep === "inst" ? "Taksit sayısı" : "Kaç kez") + '</span><input class="in" type="number" min="2" max="60" value="' + D.cnt + '" data-d="cnt"></label>';
     if (D.rep !== "one") h += '<div id="planlist"></div>';
   } else if (D.ins) h += '<p class="small muted">Taksit ' + esc(D.ins) + '. Bu değişiklik sadece bu taksiti etkiler.</p>';
-  else if (D.grp) { { const rc = (meta().recs || []).find(r => r.grp === D.grp); h += '<div class="chips" style="align-items:center;margin-bottom:8px"><span class="small muted" style="flex:1">' + (D.reg ? "Düzenli işlem" : "Abonelik") + (rc && rc.paused ? " · duraklatıldı" : "") + '</span>' + (rc ? '<button class="btn sm ghost" data-act="sub-pause">' + (rc.paused ? "Devam ettir" : "Aboneliği duraklat") + '</button>' : '') + '</div>'; }
+  else if (D.grp) { { const rc = recOfGrp(D.grp); h += '<div class="chips" style="align-items:center;margin-bottom:8px"><span class="small muted" style="flex:1">' + (D.reg ? "Düzenli işlem" : "Abonelik") + (rc && rc.paused ? " · duraklatıldı" : "") + '</span>' + (rc ? (rc.nogen ? '' : '<button class="btn sm ghost" data-act="sub-pause">' + (rc.paused ? "Devam ettir" : "Aboneliği duraklat") + '</button>') : '') + (D.reg ? '' : '<button class="btn sm ghost" data-act="sub-del">Abonelikten çıkar</button>') + '</div>'; }
     if (D.gl && D.gl.length) { const tdy = today(), all = D.gl.concat([{ me: 1, d: D.d, a: C.parseAmt(D.aStr) }]).sort((a, b) => a.d.localeCompare(b.d));
       h += '<div class="fld"><span>Tüm ödemeler</span></div><div class="schedwrap" id="glwrap" style="max-height:232px;overflow-y:auto;position:relative"><table class="sched"><tbody>' + all.map(p => p.me ? '<tr class="gl-me"><td class="muted small" style="white-space:nowrap;width:1%">Bu işlem</td><td colspan="2" class="small"><b>' + dLabel(p.d) + ' · ' + f2(p.a) + '</b></td></tr>' : (i => '<tr' + (p.d < tdy ? ' style="opacity:.7"' : '') + '><td class="muted small" style="white-space:nowrap;width:1%">' + (p.d < tdy ? "Geçmiş" : "Gelecek") + '</td><td><input type="date" data-gd="' + i + '" value="' + p.d + '" style="text-align:left"></td><td><input inputmode="decimal" data-ga="' + i + '" value="' + esc(amtIn(p.a)) + '"></td></tr>')(D.gl.indexOf(p))).join("") + '</tbody></table></div>'; } }
   h += '<div id="e-gen"></div></div><div class="sh-ft">';
@@ -1852,7 +1859,8 @@ document.addEventListener("click", e => {
     case "tx-rep": D.rep = ds.v; D.plan = null; D.planEdited = false; if (ds.v !== "one" && D.cnt < 2) D.cnt = 2; renderTx(true); break;
     case "sugg": { if (ds.cat) { D.t = ds.t; D.cat = ds.cat; renderTx(true); setTimeout(() => $("#f-amt") && !$("#f-amt").value && $("#f-amt").focus(), 30); break; } const p = derived().payees.find(x => x.t === ds.t); if (p) { D.t = p.t; if (p.cat) D.cat = p.cat; } renderTx(true); setTimeout(() => $("#f-amt") && !$("#f-amt").value && $("#f-amt").focus(), 30); break; }
     case "tx-save": saveTx(!!ds.more); break;
-    case "sub-pause": { const g = D && D.grp; if (!g) break; if (dlg.open) dlg.close(); D = null; subPause(g); render(); break; }
+    case "sub-pause": { const g = D && D.grp, rc = g && recOfGrp(g); if (!rc) break; if (dlg.open) dlg.close(); D = null; subPause(rc.grp); render(); break; }
+    case "sub-del": { const g = D && D.grp; if (!g || !confirm("Abonelikten çıkarılsın mı? İşlemler silinmez.")) break; if (dlg.open) dlg.close(); D = null; subUnlink(g); render(); break; }
     case "tx-del": if (D.grp) { const rd = 'style="background:var(--exp);color:#fff;border-color:var(--exp)"'; dlgIn.querySelector(".sh-ft").innerHTML = '<button class="btn ghost" data-act="tx-del-x">Vazgeç</button><button class="btn" ' + rd + ' data-act="tx-del-one">İşlemi sil</button><button class="btn" ' + rd + ' data-act="tx-del-rest">Gelecek işlemleri de sil</button>'; } else ask("Bu işlem silinsin mi?").then(v => v && deleteTx(false)); break;
     case "tx-del-one": deleteTx(false); break;
     case "tx-del-rest": deleteTx(true); break;
