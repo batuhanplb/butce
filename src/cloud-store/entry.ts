@@ -55,6 +55,26 @@ export function mergeMonth(base: Tx[], local: Tx[], server: Tx[]): Tx[] {
   local.forEach((t, i) => { const k = key(t, i); if (!seen.has(k)) out.push(t); });
   return out;
 }
+// 3-way merge for the settings doc: keep only keys this device changed since
+// it last saw the server; everything else comes from the server copy.
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const idArr = (v: unknown): v is Tx[] => Array.isArray(v) && v.length > 0 && v.every((x) => isObj(x) && typeof x.id === "string");
+export function mergeMeta(base: unknown, local: unknown, server: unknown): unknown {
+  const J = JSON.stringify;
+  if (J(local) === J(base)) return server === undefined ? local : server;
+  if (J(server) === J(base) || server === undefined) return local;
+  if (isObj(local) && isObj(server)) {
+    const b = isObj(base) ? base : {}, out: Record<string, unknown> = {};
+    new Set([...Object.keys(server), ...Object.keys(local)]).forEach((k) => {
+      if (!(k in local) && k in b) return; // deleted here
+      if (!(k in server) && k in b && J(local[k]) === J(b[k])) return; // deleted there
+      const v = mergeMeta(b[k], local[k], server[k]); if (v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+  if ((idArr(local) || idArr(server)) && Array.isArray(local) && Array.isArray(server)) return mergeMonth(Array.isArray(base) ? base as Tx[] : [], local as Tx[], server as Tx[]);
+  return local;
+}
 const lsGet = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : d; } catch { return d; } };
 const lsSet = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ } };
 
