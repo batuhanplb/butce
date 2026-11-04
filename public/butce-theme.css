@@ -748,3 +748,4 @@ input[type=search].in{-webkit-appearance:none;appearance:none}
 .cic.logo{ width:var(--sico,32px)!important; height:var(--sico,32px)!important; border-radius:50%!important; padding:0!important; background:#fff!important; overflow:hidden!important; display:grid!important; place-items:center!important; flex:none!important }
 .cic.logo img{ width:100%!important; height:100%!important; object-fit:cover!important; border-radius:50%!important; display:block }
 .krow .subnm .cic.logo{ margin-right:2px }
+.selbar{flex-wrap:nowrap;overflow-x:auto}.selbar .selinfo{min-width:84px}.selbar .btn{flex:0 0 auto;padding-inline:9px}
