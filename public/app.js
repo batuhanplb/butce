@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.14.1";
+const APP_VERSION = "1.3.15.0";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -708,7 +708,7 @@ function stmtRun() { const st = S.stmt; if (!st || !st.bank) return; const mine 
 function selBar() {
   if (!S.sel) return "";
   const ids = Object.keys(S.sel), all = derived().all, tot = ids.reduce((s, id) => { const t = all.find(x => x.id === id); return !t || t.k === "tr" ? s : s + (t.k === "e" ? -t.a : t.a); }, 0);
-  return '<div class="selbar"><div class="selinfo"><b>' + ids.length + ' seçildi</b><span class="' + (tot < 0 ? "neg" : "pos") + '">Toplam: ' + (tot < 0 ? "-" : "") + f2(Math.abs(tot)) + '</span></div>' + (S.stmt ? '<button class="btn sm ghost" data-act="sel-so" data-v="1" title="Önceki ekstreye taşı">← Önceki</button><button class="btn sm ghost" data-act="sel-so" data-v="-1" title="Sonraki ekstreye taşı">Sonraki →</button>' : '') + '<button class="btn sm ghost" data-act="sel-cat"' + (ids.length ? '' : ' disabled') + '>Kategori</button><button class="btn sm ghost" data-act="sel-acc"' + (ids.length ? '' : ' disabled') + '>Hesap</button><button class="btn sm ghost" data-act="sel-all">Tümünü seç</button><button class="btn sm ghost" data-act="sel-x">Vazgeç</button><button class="btn sm" style="background:var(--exp);color:#fff" data-act="sel-del"' + (ids.length ? "" : " disabled") + '>Sil</button></div>';
+  return '<div class="selbar"><div class="selinfo"><b>' + ids.length + ' seçildi</b><span class="' + (tot < 0 ? "neg" : "pos") + '">Toplam: ' + (tot < 0 ? "-" : "") + f2(Math.abs(tot)) + '</span></div>' + (S.stmt ? '<button class="btn sm ghost" data-act="sel-so" data-v="1" title="Önceki ekstreye taşı">← Önceki</button><button class="btn sm ghost" data-act="sel-so" data-v="-1" title="Sonraki ekstreye taşı">Sonraki →</button>' : '') + '<button class="btn sm ghost" data-act="sel-move"' + (ids.length ? '' : ' disabled') + '>Taşı</button><button class="btn sm ghost" data-act="sel-dup"' + (ids.length ? '' : ' disabled') + '>Çoğalt</button><button class="btn sm ghost" data-act="sel-all">Tümü</button><button class="btn sm ghost" data-act="sel-x">Vazgeç</button><button class="btn sm" style="background:var(--exp);color:#fff" data-act="sel-del"' + (ids.length ? "" : " disabled") + '>Sil</button></div>';
 }
 
 /* ---- debts ---- */
@@ -1558,6 +1558,7 @@ function openSettings(tab, fromHash) {
   renderSettings();
 }
 addEventListener("popstate", () => {
+  if (S.sel && !S.settingsOpen) { S.sel = null; render(); return; }
   const h = location.hash.slice(1);
   if (h === "settings" || h.startsWith("settings/")) openSettings(h.split("/")[1]?.split("?")[0] || "main", true);
   else if (S.settingsOpen) closeSheet(true);
@@ -1839,7 +1840,9 @@ document.addEventListener("click", e => {
       if (v.startsWith("g:")) { S.view = "tx"; S.per = "30"; S.accFs = []; S.q = ""; S.showPastTx = true; S.showFutTx = false; S.showE = v === "g:e"; S.showI = v === "g:i"; } else S.view = v;
       if (location.hash.slice(1) !== S.view) location.hash = S.view; render(); window.scrollTo(0, 0); break; }
     case "close": closeSheet(); break;
-    case "sel-x": S.sel = null; render(); break;
+    case "sel-x": S.sel = null; render(); if (history.state && history.state.sel) history.back(); break;
+    case "sel-move": ask("Neyi değiştirelim?", [{ l: "Kategori", v: "sel-cat" }, { l: "Hesap", v: "sel-acc" }]).then(v => { if (!v) return; const b = document.createElement("button"); b.dataset.act = v; b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }); break;
+    case "sel-dup": { const sel = S.sel || {}; let n = 0; new Set(Object.values(sel)).forEach(m => { const arr = monthItems(m), add = arr.filter(t => sel[t.id]).map(t => { n++; const o = { ...clone(t), id: C.rid(), ts: Date.now() + n }; delete o.grp; return o; }); if (add.length) { const nx = arr.concat(add); S.months[m] = nx; saveMonth(m, nx); } }); S.sel = null; render(); if (history.state && history.state.sel) history.back(); toast(n + " işlem çoğaltıldı"); break; }
     case "sel-all": S.sel = S.sel || {}; (S._vis || []).forEach(([id, m]) => { S.sel[id] = m; }); render(); break;
     case "sel-so": { const sel = S.sel || {}, dv = +ds.v, ms = new Set(Object.values(sel)); let n = 0;
       ms.forEach(m => { const arr = monthItems(m).map(t => { if (!sel[t.id]) return t; n++; const so = (t.so || 0) - dv, o = { ...t }; if (so) o.so = so; else delete o.so; return o; }); S.months[m] = arr; saveMonth(m, arr); });
@@ -2170,7 +2173,7 @@ function accDrag() {
 /* long-press multi-select in transactions */
 (() => { let tm = null, sx = 0, sy = 0;
   document.addEventListener("pointerdown", e => { const b = e.target.closest("button.tx"); if (!b || S.view !== "tx") return; sx = e.clientX; sy = e.clientY; clearTimeout(tm);
-    tm = setTimeout(() => { tm = null; S.sel = S.sel || {}; S.sel[b.dataset.id] = b.dataset.m; S.selSkip = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} render(); setTimeout(() => { S.selSkip = false; }, 600); }, 450); });
+    tm = setTimeout(() => { tm = null; if (!S.sel) history.pushState({ ...(history.state || {}), sel: 1 }, "", location.href); S.sel = S.sel || {}; S.sel[b.dataset.id] = b.dataset.m; S.selSkip = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} render(); setTimeout(() => { S.selSkip = false; }, 600); }, 450); });
   const cancel = () => { clearTimeout(tm); tm = null; };
   document.addEventListener("pointermove", e => { if (tm && (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8)) cancel(); });
   document.addEventListener("pointerup", cancel); document.addEventListener("pointercancel", cancel);
