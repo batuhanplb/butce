@@ -749,3 +749,29 @@ input[type=search].in{-webkit-appearance:none;appearance:none}
 .cic.logo img{ width:100%!important; height:100%!important; object-fit:cover!important; border-radius:50%!important; display:block }
 .krow .subnm .cic.logo{ margin-right:2px }
 .selbar{flex-wrap:nowrap;overflow-x:auto}.selbar .selinfo{min-width:84px}.selbar .btn{flex:0 0 auto;padding-inline:9px}
+
+/* =================================================================
+   16. Appllama uyumu: erişilebilirlik + native odak & dokunma (1.3.15.2)
+   Appllama "app-design" çıtasının web'e uyarlanan üç maddesi:
+   1) Klavye odağı: her buton/bağlantı/tabindex öğesi tutarlı, temalı bir
+      halka gösterir (tarayıcının soğuk mavi kutusu yerine --focus). Form
+      girdilerinin kendi odağına dokunulmaz.
+   2) Kopyalanabilir veri: işlem tablosu ve hesap bakiyeleri seçilip
+      kopyalanabilir (hesap numarası/IBAN, tutarlar).
+   3) Dokunma hedefi: küçük ikon butonların basılabilir alanı yerleşimi
+      bozmadan genişletilir (hedef ≥ ~44px).
+   Yalnız sunum; hesaplama, akış ve yerleşim değişmez. Blok silinerek
+   geri alınabilir.
+   ================================================================= */
+
+/* 1. Klavye odak halkası (düşük özgüllük: mevcut form kuralları kazanır) */
+:where(button,a,[tabindex]):focus-visible{outline:2px solid var(--focus,var(--tr));outline-offset:2px}
+
+/* 2. Kopyalanabilir finansal veri */
+.sh td,.sh th,.bal,.accstrip .acc .v{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+
+/* 3. Dokunmatikte genişletilmiş basma alanı (küçük ikon butonlar) */
+@media (pointer:coarse){
+  .ib,.simdel,.cash-nav .ib{position:relative}
+  .ib::after,.simdel::after,.cash-nav .ib::after{content:"";position:absolute;inset:-7px}
+}
