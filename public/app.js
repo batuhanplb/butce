@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.3.15.0";
+const APP_VERSION = "1.3.15.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -708,7 +708,7 @@ function stmtRun() { const st = S.stmt; if (!st || !st.bank) return; const mine 
 function selBar() {
   if (!S.sel) return "";
   const ids = Object.keys(S.sel), all = derived().all, tot = ids.reduce((s, id) => { const t = all.find(x => x.id === id); return !t || t.k === "tr" ? s : s + (t.k === "e" ? -t.a : t.a); }, 0);
-  return '<div class="selbar"><div class="selinfo"><b>' + ids.length + ' seçildi</b><span class="' + (tot < 0 ? "neg" : "pos") + '">Toplam: ' + (tot < 0 ? "-" : "") + f2(Math.abs(tot)) + '</span></div>' + (S.stmt ? '<button class="btn sm ghost" data-act="sel-so" data-v="1" title="Önceki ekstreye taşı">← Önceki</button><button class="btn sm ghost" data-act="sel-so" data-v="-1" title="Sonraki ekstreye taşı">Sonraki →</button>' : '') + '<button class="btn sm ghost" data-act="sel-move"' + (ids.length ? '' : ' disabled') + '>Taşı</button><button class="btn sm ghost" data-act="sel-dup"' + (ids.length ? '' : ' disabled') + '>Çoğalt</button><button class="btn sm ghost" data-act="sel-all">Tümü</button><button class="btn sm ghost" data-act="sel-x">Vazgeç</button><button class="btn sm" style="background:var(--exp);color:#fff" data-act="sel-del"' + (ids.length ? "" : " disabled") + '>Sil</button></div>';
+  return '<div class="selbar"><div class="selinfo"><b>' + ids.length + ' seçildi</b><span class="' + (tot < 0 ? "neg" : "pos") + '">Toplam: ' + (tot < 0 ? "-" : "") + f2(Math.abs(tot)) + '</span></div>' + (S.stmt ? '<button class="btn sm ghost" data-act="sel-so" data-v="1" title="Önceki ekstreye taşı">← Önceki ay</button><button class="btn sm ghost" data-act="sel-so" data-v="-1" title="Sonraki ekstreye taşı">Sonraki ay →</button>' : '<button class="btn sm ghost" data-act="sel-move"' + (ids.length ? '' : ' disabled') + '>Taşı</button><button class="btn sm ghost" data-act="sel-dup"' + (ids.length ? '' : ' disabled') + '>Çoğalt</button><button class="btn sm ghost" data-act="sel-all">Tümü</button>') + '<button class="btn sm ghost" data-act="sel-x">Vazgeç</button><button class="btn sm" style="background:var(--exp);color:#fff" data-act="sel-del"' + (ids.length ? "" : " disabled") + '>Sil</button></div>';
 }
 
 /* ---- debts ---- */
