@@ -775,3 +775,69 @@ input[type=search].in{-webkit-appearance:none;appearance:none}
   .ib,.simdel,.cash-nav .ib{position:relative}
   .ib::after,.simdel::after,.cash-nav .ib::after{content:"";position:absolute;inset:-7px}
 }
+
+/* =================================================================
+   17. Cesur görünüm refresh — "okyanus" (1.4.0.0)
+   Daha net hiyerarşi, ferah boşluk, tek yarıçap ölçeği, okyanus mavisi
+   accent + sıcak gri nötrler. Yalnız sunum; hesaplama, akış ve dashboard
+   koordinatları değişmez. Bu blok silinerek geri alınabilir.
+   ================================================================= */
+
+/* --- A. Palet (yalnız yaprak değerler; takma adlar kendiliğinden izler) --- */
+:root{
+  --bg:oklch(.977 .005 80);--surface:oklch(.997 .002 80);--sunk:oklch(.952 .008 80);--line:oklch(.893 .012 80);
+  --ink:oklch(.24 .014 80);--muted:oklch(.48 .014 80);--faint:oklch(.62 .011 80);
+  --primary:oklch(.5 .135 235);--c3:oklch(.952 .032 235);--focus:var(--primary);
+}
+html[data-theme=dark]{
+  --bg:oklch(.165 .006 80);--surface:oklch(.21 .008 80);--sunk:oklch(.245 .009 80);--line:oklch(.315 .012 80);
+  --ink:oklch(.93 .006 80);--muted:oklch(.72 .01 80);--faint:oklch(.6 .01 80);
+  --primary:oklch(.74 .12 235);--on-primary:oklch(.18 .03 235);--c3:oklch(.29 .05 235);--focus:var(--primary);
+}
+html[data-theme=softdark]{
+  --bg:oklch(.255 .007 80);--surface:oklch(.295 .009 80);--sunk:oklch(.33 .01 80);--line:oklch(.39 .012 80);
+  --ink:oklch(.9 .006 80);--muted:oklch(.7 .01 80);--faint:oklch(.58 .01 80);
+  --primary:oklch(.74 .11 235);--on-primary:oklch(.2 .03 235);--c3:oklch(.34 .045 235);--focus:var(--primary);
+}
+
+/* --- B. Tipografi: daha net hiyerarşi --- */
+body{font-size:14px;line-height:1.5}
+.top h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.sh-hd h3{font-size:17px;font-weight:700}
+.mod-h h3,.mod.sm .mod-h h3{font-size:13.5px;font-weight:650}
+.mod-n b,.mod.sm .mod-n b{font-size:23px;font-weight:750;letter-spacing:-.02em}
+.krow b,.mod.sm .krow b{font-size:12.5px}
+.tx .t,.catrow .grow{font-size:13.5px}
+.set-row .grow,.catrow .grow{font-size:13.5px}
+
+/* --- C. Yarıçap ölçeği: kart 12 / hücre 10 / kontrol 10 --- */
+.card,.mod,.tw,.sh-hd{border-radius:12px}
+.sum>div,.cash-sum>div,.pie-det-cell{--cell-r:10px;border-radius:10px}
+.in,.catsel,.cat-search,.search,.sel,.dpick,textarea{border-radius:10px}
+.btn{border-radius:10px}.ib,.mod-go,.ed-b,.dg-b,.simdel{border-radius:10px}
+.pill,.chip,.seg{border-radius:8px}.fab{border-radius:16px}
+dialog.sheet,.askbox{border-radius:16px}
+
+/* --- D. Yüzey: çok hafif dinlenme gölgesi --- */
+.card,.mod,.sh-hd{box-shadow:0 1px 2px color-mix(in oklab,var(--ink) 7%,transparent)}
+
+/* --- E. Boşluk ritmi: daha ferah --- */
+main{padding-top:22px}
+.mod{padding:16px}.mods{gap:14px}
+.sum{padding:14px;gap:10px}
+.krow{padding:9px 0}
+
+/* --- F. Hareket: tek eğri, yumuşak giriş --- */
+:root{--ease:cubic-bezier(.23,1,.32,1)}
+#root.vin main{animation:vin .26s var(--ease)}
+@keyframes vin{from{opacity:0;transform:translateY(10px) scale(.995)}}
+
+/* --- G. Mobil: aktif sekme pilli, alt menü bir tık yüksek --- */
+@media(max-width:899px){
+  body{font-size:13.5px}
+  .top h1{font-size:20px}
+  .mod,.mod.sm{padding:14px 12px}
+  .mods{gap:12px}
+  .mnav button{height:60px}
+  .mnav button[aria-current="page"]{background:color-mix(in oklab,var(--primary) 12%,transparent)}
+}
