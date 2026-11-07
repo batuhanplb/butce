@@ -1,10 +1,10 @@
 import * as C from "./core.js";
 import { formatAmountField } from "./transaction-input.js";
-import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement.js";
+import { stmtRange, parseStatementLines, statementTotal, reconcile, pdfLines } from "./statement.js";
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.4.1.0";
+const APP_VERSION = "1.4.1.1";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -713,7 +713,7 @@ function vStmt(items) {
   S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
   return h + selBar();
 }
-function stmtRun() { const st = S.stmt; if (!st || !st.bank) return; const mine = derived().all.filter(t => t.acc === st.acc && t.k === "e" && t.d >= C.ymd(new Date(new Date(st.r[0]) - 3 * 864e5)) && t.d <= C.ymd(new Date(new Date(st.r[1]).getTime() + 3 * 864e5))); const inR = st.bank.filter(b => !b.credit); st.res = { ...reconcile(st.bank, mine, ((meta().stmtLinks || {})[st.acc]) || []), bankTot: inR.reduce((q, b) => q + b.a, 0) }; st.res.extra = st.res.extra.filter(t => t.d >= st.r[0] && t.d <= st.r[1]); if (st.pick) { const R = st.res, pb = st.pick.b; R.diff = R.diff.filter(x => { if (x.b.d === pb.d && x.b.a === pb.a && x.b.t === pb.t) { R.extra.push(x.t); return false; } return true; }); } }
+function stmtRun() { const st = S.stmt; if (!st || !st.bank) return; const mine = derived().all.filter(t => t.acc === st.acc && t.k === "e" && t.d >= C.ymd(new Date(new Date(st.r[0]) - 3 * 864e5)) && t.d <= C.ymd(new Date(new Date(st.r[1]).getTime() + 3 * 864e5))); st.res = { ...reconcile(st.bank, mine, ((meta().stmtLinks || {})[st.acc]) || []), bankTot: st.bankTot ?? statementTotal([], st.bank) }; st.res.extra = st.res.extra.filter(t => t.d >= st.r[0] && t.d <= st.r[1]); if (st.pick) { const R = st.res, pb = st.pick.b; R.diff = R.diff.filter(x => { if (x.b.d === pb.d && x.b.a === pb.a && x.b.t === pb.t) { R.extra.push(x.t); return false; } return true; }); } }
 function selBar() {
   if (!S.sel) return "";
   const ids = Object.keys(S.sel), all = derived().all, tot = ids.reduce((s, id) => { const t = all.find(x => x.id === id); return !t || t.k === "tr" ? s : s + (t.k === "e" ? -t.a : t.a); }, 0);
@@ -1837,7 +1837,7 @@ document.addEventListener("click", e => {
     case "stmt-ck": { const pk = S.stmt.pick; if (!pk) break; const k = pk.ids.indexOf(ds.id); k >= 0 ? pk.ids.splice(k, 1) : pk.ids.push(ds.id); render(); break; }
     case "stmt-link": { const pk = S.stmt.pick, acc = S.stmt.acc; if (!pk || !pk.ids.length) break; const L = { d: pk.b.d, a: pk.b.a, ids: pk.ids.slice() }; S.stmt.pick = null; saveMetaChange(m => { m.stmtLinks = m.stmtLinks || {}; m.stmtLinks[acc] = (m.stmtLinks[acc] || []).filter(l => !(l.d === L.d && Math.abs(l.a - L.a) < 0.01)).concat(L); }); stmtRun(); render(); toast("Eşleştirildi"); break; }
     case "stmt-unlink": { const acc = S.stmt.acc, d = ds.d, a0 = +ds.a; saveMetaChange(m => { if (m.stmtLinks && m.stmtLinks[acc]) m.stmtLinks[acc] = m.stmtLinks[acc].filter(l => !(l.d === d && Math.abs(l.a - a0) < 0.01)); }); stmtRun(); render(); break; }
-    case "stmt-up": { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/pdf,.pdf"; inp.onchange = async () => { const f = inp.files[0]; if (!f || !S.stmt) return; S.stmt.busy = true; S.stmt.err = null; render(); try { const bank = parseStatementLines(await pdfLines(f)); if (!bank.length) throw new Error("PDF'te işlem satırı bulunamadı."); S.stmt.bank = bank.filter(b => b.d >= S.stmt.r[0] && b.d <= S.stmt.r[1]).length ? bank.filter(b => b.d >= S.stmt.r[0] && b.d <= S.stmt.r[1]) : bank; stmtRun(); } catch (e) { console.error(e); S.stmt.err = e.message && e.message.includes("bulunamadı") ? e.message : "PDF okunamadı."; } S.stmt.busy = false; render(); }; inp.click(); break; }
+    case "stmt-up": { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/pdf,.pdf"; inp.onchange = async () => { const f = inp.files[0]; if (!f || !S.stmt) return; S.stmt.busy = true; S.stmt.err = null; render(); try { const lines = await pdfLines(f), bank = parseStatementLines(lines); if (!bank.length) throw new Error("PDF'te işlem satırı bulunamadı."); S.stmt.bank = bank.filter(b => b.d >= S.stmt.r[0] && b.d <= S.stmt.r[1]).length ? bank.filter(b => b.d >= S.stmt.r[0] && b.d <= S.stmt.r[1]) : bank; S.stmt.bankTot = statementTotal(lines, S.stmt.bank); stmtRun(); } catch (e) { console.error(e); S.stmt.err = e.message && e.message.includes("bulunamadı") ? e.message : "PDF okunamadı."; } S.stmt.busy = false; render(); }; inp.click(); break; }
     case "stmt-add": { const b = S.stmt.res.missing[+ds.i]; if (b) { S._stmtAdd = b; openTx({ k: "e", acc: S.stmt.acc, t: b.t, d: b.d, a: b.a }); } break; }
     case "stmt-fix": { S.stmt.peek = null; const x = S.stmt.res.diff[+ds.i]; if (!x) break; const m = x.t.d.slice(0, 7), arr = monthItems(m).map(t => t.id === x.t.id ? { ...t, a: C.r2(x.b.a) } : t); S.months[m] = arr; saveMonth(m, arr); stmtRun(); render(); toast && toast("Tutar düzeltildi"); break; }
     case "acc-menu": accountMenu(ds.id, el); break;
