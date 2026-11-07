@@ -48,7 +48,9 @@ export function parseStatementLines(lines) {
     if (!isFinite(a) || a === 0) continue;
     const t = rest.slice(0, rest.indexOf(first)).replace(DATE_RE, "").replace(/\s+/g, " ").trim();
     if (/önceki dönem|toplam|asgari|son ödeme|dönem borcu/i.test(t)) continue;
-    const credit = a < 0 || /ödeme|iade|iptal/i.test(t);
+    const plus = rest.charAt(rest.indexOf(first) + first.length) === "+";
+    // "FATURA ÖDEME" gibi harcamalar gider; kart ödemeleri "+" veya "teşekkür" ile gelir.
+    const credit = a < 0 || plus || /iade|iptal|teşekkür|tesekkur/i.test(t);
     out.push({ d: yy + "-" + pad(mo) + "-" + pad(dd), a: Math.abs(a), t, credit });
   }
   return out;
