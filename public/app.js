@@ -1,10 +1,10 @@
 import * as C from "./core.js";
 import { formatAmountField } from "./transaction-input.js";
-import { stmtRange, parseStatementLines, statementTotal, reconcile, pdfLines } from "./statement.js";
+import { stmtRange, parseStatementLines, statementTotal, statementRowKey, ignoreStatementRows, reconcile, pdfLines } from "./statement.js";
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.4.1.1";
+const APP_VERSION = "1.4.2.0";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -697,8 +697,8 @@ function vStmt(items) {
   const pk = st.pick;
   const tn = t => esc(t.t || catLabel(t.cat, true));
   const row = (b, t, kind, x) => '<li><div class="set-row"><span class="grow"><b>' + (b || t).d.slice(8, 10) + '.' + (b || t).d.slice(5, 7) + ' · ' + esc(b ? b.t || "İşlem" : tn(t)) + '</b><br><span class="muted small">' + dLabel((b || t).d) + (b && t && kind === "diff" ? " · uygulamada " + f2(t.a) : "") + (kind === "ok" && x && x.t && x.t.d !== x.b.d ? " · uygulamada " + dLabel(x.t.d) : "") + (kind === "ok" && x ? " · " + (x.manual ? "elle · " : x.split ? "bölünmüş · " : "") + x.ts.map(q => tn(q) + " " + f2(q.a)).join(" + ") : "") + '</span></span><b style="white-space:nowrap">' + f2((b || t).a) + '</b>' +
-    (kind === "miss" ? '<button class="btn sm ghost" data-act="stmt-pick" data-i="' + R.missing.indexOf(b) + '">Eşleştir</button><button class="btn sm" data-act="stmt-add" data-i="' + R.missing.indexOf(b) + '">Ekle</button>' : kind === "diff" ? stmtDiffBtns(R, b, t) : kind === "extra" ? (pk ? '<input type="checkbox" class="stmt-ck" data-act="stmt-ck" data-id="' + esc(t.id) + '"' + (pk.ids.includes(t.id) ? ' checked' : '') + ' style="width:22px;height:22px">' : '<button class="btn sm" data-act="edit-tx" data-id="' + esc(t.id) + '" data-m="' + t.d.slice(0, 7) + '">Aç</button>') : kind === "ok" && x && x.manual ? '<button class="btn sm ghost" data-act="stmt-unlink" data-d="' + b.d + '" data-a="' + b.a + '">Ayır</button>' : '') + '</div></li>';
-  const sec = (title, list, kind) => { const L = srt(list, x => kind === "miss" ? x.d : kind === "extra" ? x.d : x.b.d); return L.length ? '<div class="day"><span>' + title + '</span><span>' + L.length + '</span></div><div class="card"><ul class="list">' + L.map(x => kind === "miss" ? row(x, null, kind) : kind === "extra" ? row(null, x, kind) : row(x.b, x.t, kind, x)).join("") + '</ul></div>' : ''; };
+    (kind === "miss" ? '<button class="btn sm ghost" data-act="stmt-pick" data-i="' + R.missing.indexOf(b) + '">Eşleştir</button><button class="btn sm" data-act="stmt-add" data-i="' + R.missing.indexOf(b) + '">Ekle</button>' : kind === "diff" ? stmtDiffBtns(R, b, t) : kind === "extra" ? (pk ? '<input type="checkbox" class="stmt-ck" data-act="stmt-ck" data-id="' + esc(t.id) + '"' + (pk.ids.includes(t.id) ? ' checked' : '') + ' style="width:22px;height:22px">' : '<button class="btn sm" data-act="edit-tx" data-id="' + esc(t.id) + '" data-m="' + t.d.slice(0, 7) + '">Aç</button>') : kind === "ok" && x && x.manual ? '<button class="btn sm ghost" data-act="stmt-unlink" data-d="' + b.d + '" data-a="' + b.a + '">Ayır</button>' : '') + (!pk && (kind === "miss" || kind === "diff" || kind === "extra" || kind === "ok" && t && t.d !== b.d) ? '<button class="btn sm ghost" data-act="stmt-ignore" data-key="' + esc(statementRowKey(kind, b, t)) + '">Yoksay</button>' : kind === "ignored" ? '<button class="btn sm ghost" data-act="stmt-restore" data-key="' + esc(x.key) + '">Geri al</button>' : '') + '</div></li>';
+  const sec = (title, list, kind) => { const L = srt(list, x => kind === "miss" ? x.d : kind === "extra" ? x.d : (x.b || x.t).d); return L.length ? '<div class="day"><span>' + title + '</span><span>' + L.length + '</span></div><div class="card"><ul class="list">' + L.map(x => kind === "miss" ? row(x, null, kind) : kind === "extra" ? row(null, x, kind) : row(x.b, x.t, kind, x)).join("") + '</ul></div>' : ''; };
   if (R) {
     if (pk) {
       const sum = R.extra.filter(t => pk.ids.includes(t.id)).reduce((q, t) => q + t.a, 0);
@@ -707,13 +707,14 @@ function vStmt(items) {
       if (!R.extra.length) h += '<div class="empty">Eşleştirilecek boşta işlem yok.</div>';
     } else {
       h += sec("Ekstrede var, uygulamada yok", R.missing, "miss") + sec("Tutarı farklı", R.diff, "diff") + sec("Uygulamada var, ekstrede yok", R.extra, "extra") + sec("Tarihi farklı (±3 gün)", R.ok.filter(x => x.t && x.t.d !== x.b.d), "ok") + sec("Eşleşenler ✓", R.ok.filter(x => !x.t || x.t.d === x.b.d), "ok");
-      if (!R.missing.length && !R.diff.length && !R.extra.length) h += '<div class="empty">Her şey eşleşiyor ✓</div>';
+      if (R.ignored.length) h += '<details><summary>Yoksayılanlar (' + R.ignored.length + ')</summary>' + sec("Yoksayılanlar", R.ignored, "ignored") + '</details>';
+      if (!R.missing.length && !R.diff.length && !R.extra.length && !R.ignored.length) h += '<div class="empty">Her şey eşleşiyor ✓</div>';
     }
   } else h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t).replace('<span class="s">', '<span class="s">' + dLabel(t.d) + ' · ')).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok.</div>';
   S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
   return h + selBar();
 }
-function stmtRun() { const st = S.stmt; if (!st || !st.bank) return; const mine = derived().all.filter(t => t.acc === st.acc && t.k === "e" && t.d >= C.ymd(new Date(new Date(st.r[0]) - 3 * 864e5)) && t.d <= C.ymd(new Date(new Date(st.r[1]).getTime() + 3 * 864e5))); st.res = { ...reconcile(st.bank, mine, ((meta().stmtLinks || {})[st.acc]) || []), bankTot: st.bankTot ?? statementTotal([], st.bank) }; st.res.extra = st.res.extra.filter(t => t.d >= st.r[0] && t.d <= st.r[1]); if (st.pick) { const R = st.res, pb = st.pick.b; R.diff = R.diff.filter(x => { if (x.b.d === pb.d && x.b.a === pb.a && x.b.t === pb.t) { R.extra.push(x.t); return false; } return true; }); } }
+function stmtRun() { const st = S.stmt; if (!st || !st.bank) return; const mine = derived().all.filter(t => t.acc === st.acc && t.k === "e" && t.d >= C.ymd(new Date(new Date(st.r[0]) - 3 * 864e5)) && t.d <= C.ymd(new Date(new Date(st.r[1]).getTime() + 3 * 864e5))); st.res = { ...reconcile(st.bank, mine, ((meta().stmtLinks || {})[st.acc]) || []), bankTot: st.bankTot ?? statementTotal([], st.bank) }; st.res.extra = st.res.extra.filter(t => t.d >= st.r[0] && t.d <= st.r[1]); st.res = ignoreStatementRows(st.res, (meta().stmtIgnored || {})[st.acc] || []); if (st.pick) { const R = st.res, pb = st.pick.b; R.diff = R.diff.filter(x => { if (x.b.d === pb.d && x.b.a === pb.a && x.b.t === pb.t) { R.extra.push(x.t); return false; } return true; }); } }
 function selBar() {
   if (!S.sel) return "";
   const ids = Object.keys(S.sel), all = derived().all, tot = ids.reduce((s, id) => { const t = all.find(x => x.id === id); return !t || t.k === "tr" ? s : s + (t.k === "e" ? -t.a : t.a); }, 0);
@@ -1828,6 +1829,8 @@ document.addEventListener("click", e => {
     case "stmt": { const a = meta().accounts.find(x => x.id === ds.id); if (!a) break; S.stmt = { acc: a.id, off: 0, r: stmtRange(a.cut || 1) }; S.view = "tx"; S.sel = null; if (location.hash.slice(1) !== "tx") location.hash = "tx"; render(); window.scrollTo(0, 0); break; }
     case "stmt-per": { const a = meta().accounts.find(x => x.id === S.stmt.acc); S.stmt.off += +ds.v; S.stmt.r = stmtRange(a.cut || 1, new Date(), S.stmt.off); stmtRun(); render(); break; }
     case "stmt-close": S.stmt = null; render(); break;
+    case "stmt-ignore":
+    case "stmt-restore": { const st = S.stmt; if (!st || !ds.key) break; const hide = act === "stmt-ignore"; saveMetaChange(m => { m.stmtIgnored = m.stmtIgnored || {}; const keys = m.stmtIgnored[st.acc] || []; m.stmtIgnored[st.acc] = hide ? [...new Set([...keys, ds.key])] : keys.filter(k => k !== ds.key); }); st.peek = null; st.pick = null; stmtRun(); render(); break; }
     case "stmt-sort": { const nx = S.stmtSort === "esk" ? "yen" : "esk"; S.stmtSort = nx; saveMetaChange(m => { m.stmtSort = nx; }); render(); break; }
     case "rep": { const m = ds.m; if (S.settingsOpen) history.pushState(history.state, "", location.pathname + location.search + "#settings/rep?m=" + m); D = { view: "rep", m, back: ds.back || false }; renderSettings(); if (!(meta().reportSeen || {})[m] && S.loaded.meta) saveMetaChange(x => { x.reportSeen = { ...(x.reportSeen || {}), [m]: 1 }; }); break; }
     case "stmt-pick": { S.stmt.peek = null; const R = S.stmt.res; let b; if (ds.di != null) { const x = R.diff[+ds.di]; b = x.b; S.stmt.pick = { b, ids: [x.t.id] }; } else { b = R.missing[+ds.i]; S.stmt.pick = { b, ids: [] }; } render(); window.scrollTo(0, 0); break; }
