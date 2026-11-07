@@ -31,12 +31,21 @@ const AMT_RE = /[-(]?\d{1,3}(?:\.\d{3})*,\d{2}\)?-?|[-(]?\d+,\d{2}\)?-?/g;
 
 // Dönem borcu işlem toplamı değildir: devir, ödemeler ve iadeleri banka hesaplar.
 export function statementTotal(lines, rows) {
-  for (const raw of lines) {
-    const line = raw.replace(/\s+/g, " ").trim();
-    const match = line.match(/d[öo]nem borcu\s*(?:TL|₺)\s*:?\s*([-\d.,]+)/i);
-    if (match) {
-      const amount = parseTrAmount(match[1]);
-      if (Number.isFinite(amount)) return amount;
+  const LBL = /(?:d[öo]nem borcu|toplam d[öo]nem borcu|toplam bor[çc]|yeni bor[çc]|d[öo]nem toplam)/i;
+  const MONEY = /-?\d{1,3}(?:\.\d{3})*,\d{2}/;
+  const txt = lines.map(raw => raw.replace(/\s+/g, " ").trim());
+  for (let i = 0; i < txt.length; i++) {
+    if (!LBL.test(txt[i])) continue;
+    // etiket + para birimi + tutar (aynı satır)
+    let m = txt[i].match(/(?:d[öo]nem borcu|toplam d[öo]nem borcu|toplam bor[çc]|yeni bor[çc]|d[öo]nem toplam)\s*(?:TL|₺|TRY)\s*:?\s*([-\d.,]+)/i);
+    if (m) { const a = parseTrAmount(m[1]); if (Number.isFinite(a)) return a; }
+    // etiketle aynı satırda kuruşlu tutar
+    m = txt[i].match(MONEY);
+    if (m) { const a = parseTrAmount(m[0]); if (Number.isFinite(a)) return a; }
+    // etiketin altındaki 1-3 satırda kuruşlu tutar
+    for (let j = 1; j <= 3 && i + j < txt.length; j++) {
+      m = txt[i + j].match(MONEY);
+      if (m) { const a = parseTrAmount(m[0]); if (Number.isFinite(a)) return a; }
     }
   }
   // Başlık bulunamazsa önceki borç ödemelerini değil, yalnızca iadeleri düş.
@@ -73,48 +82,114 @@ export function parseStatementLines(lines) {
 
 const dayDiff = (a, b) => Math.abs((new Date(a) - new Date(b)) / 864e5);
 
+// Açıklama benzerliği: Türkçe normalizasyon + token (Jaccard) + alt dize.
+const norm = s => (s || "").toLocaleLowerCase("tr").replace(/[^a-zçğıöşü0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+function sim(a, b) {
+  const A = norm(a), B = norm(b);
+  if (!A || !B) return 0;
+  if (A === B) return 1;
+  if (A.includes(B) || B.includes(A)) return 0.9;
+  const ta = new Set(A.split(" ").filter(w => w.length > 1));
+  const tb = new Set(B.split(" ").filter(w => w.length > 1));
+  if (!ta.size || !tb.size) return 0;
+  let inter = 0; ta.forEach(w => { if (tb.has(w)) inter++; });
+  return inter / new Set([...ta, ...tb]).size;
+}
+const txDesc = t => norm((t.t || "") + " " + (t.n || ""));
+const isRefund = c => /iade|iptal|iadeler/i.test(c.t || "");
+
 // Ekstre satırlarını uygulamadaki işlemlerle karşılaştırır.
-// ok: tarih±3 gün ve tutar aynı; diff: tarih±3 gün ve aynı açıklama/en yakın, tutar farklı; missing: bankada var bizde yok; extra: bizde var bankada yok
+// ok: yüksek güven eşleşme (elle / birebir / bölünmüş / iade-net);
+// suggest: muhtemel ama onay bekleyen (açıklama zayıf, iade-net, kayma);
+// diff: aynı gün ama tutar farklı; missing: bankada var bizde yok;
+// extra: bizde var bankada yok; credits: ekstrenin iade/ödeme satırları.
 export function reconcile(bank, mine, links = []) {
-  const used = new Set(), ok = [], diff = [], missing = [];
-  const rows = bank.filter(b => !b.credit);
+  const used = new Set(), ok = [], suggest = [], diff = [], missing = [];
+  const debits = bank.filter(b => !b.credit);
+  const creditRows = bank.filter(b => b.credit);
   const idx = new Map(mine.map((t, i) => [t.id, i]));
   const near = (t, b, n) => dayDiff(t.d, b.d) <= n;
+
+  // 0) Kullanıcının elle eşleştirdikleri (iade-net dahil)
   const rest = [];
-  // 1) Kullanıcının elle eşleştirdikleri
-  for (const b of rows) {
+  for (const b of debits) {
     const L = links.find(l => l.d === b.d && Math.abs(l.a - b.a) < 0.01 && l.ids.every(id => idx.has(id) && !used.has(idx.get(id))));
-    if (L) { const ts = L.ids.map(id => mine[idx.get(id)]); L.ids.forEach(id => used.add(idx.get(id))); ok.push({ b, t: ts[0], ts, manual: true }); }
-    else rest.push(b);
+    if (L) {
+      const ts = L.ids.map(id => mine[idx.get(id)]);
+      L.ids.forEach(id => used.add(idx.get(id)));
+      if (L.ref) {
+        const ci = creditRows.findIndex(c => c.d === L.ref.d && Math.abs(c.a - L.ref.a) < 0.01);
+        const refund = ci >= 0 ? creditRows.splice(ci, 1)[0] : L.ref;
+        ok.push({ b, t: ts[0], ts, manual: true, net: true, refund });
+      } else ok.push({ b, t: ts[0], ts, manual: true });
+    } else rest.push(b);
   }
-  // 2) Birebir: tutar aynı, tarih ±3 gün
+
+  // 1) Birebir: tutar aynı, tarih ±5 gün; açıklama uyumluysa kesin, değilse öneri
+  const still = [];
   for (const b of rest) {
     let best = null;
-    mine.forEach((t, i) => { if (!used.has(i) && Math.abs(t.a - b.a) < 0.01 && near(t, b, 3) && (!best || dayDiff(t.d, b.d) < best.dd)) best = { i, dd: dayDiff(t.d, b.d) }; });
-    if (best) { used.add(best.i); ok.push({ b, t: mine[best.i], ts: [mine[best.i]] }); continue; }
-    missing.push(b);
+    mine.forEach((t, i) => {
+      if (used.has(i)) return;
+      if (Math.abs(t.a - b.a) >= 0.01) return;
+      if (!near(t, b, 5)) return;
+      const s = { i, dd: dayDiff(t.d, b.d), sc: sim(b.t, txDesc(t)) };
+      if (!best || s.sc > best.sc + 0.001 || (Math.abs(s.sc - best.sc) <= 0.001 && s.dd < best.dd)) best = s;
+    });
+    if (best) {
+      used.add(best.i);
+      const item = { b, t: mine[best.i], ts: [mine[best.i]] };
+      const db = norm(b.t), dm = txDesc(mine[best.i]);
+      const sure = best.sc >= 0.35 || (best.dd === 0 && (!db || !dm));
+      (sure ? ok : suggest).push(item);
+    } else still.push(b);
   }
-  // 3) Bölünmüş: ±2 gündeki 2-3 işlemin toplamı ekstre satırına eşit
+
+  // 2) Bölünmüş: ±5 gündeki 2-3 işlemin toplamı ekstre satırına eşit
   const left = [];
-  for (const b of missing) {
-    const c = mine.map((t, i) => i).filter(i => !used.has(i) && near(mine[i], b, 2) && mine[i].a < b.a + 0.01);
+  for (const b of still) {
+    const c = mine.map((t, i) => i).filter(i => !used.has(i) && near(mine[i], b, 5) && mine[i].a < b.a + 0.01);
     let hit = null;
     for (let x = 0; x < c.length && !hit; x++) for (let y = x + 1; y < c.length && !hit; y++) {
       const s2 = mine[c[x]].a + mine[c[y]].a;
       if (Math.abs(s2 - b.a) < 0.01) { hit = [c[x], c[y]]; break; }
       for (let z = y + 1; z < c.length; z++) if (Math.abs(s2 + mine[c[z]].a - b.a) < 0.01) { hit = [c[x], c[y], c[z]]; break; }
     }
-    if (hit) { hit.forEach(i => used.add(i)); ok.push({ b, t: mine[hit[0]], ts: hit.map(i => mine[i]), split: true }); } else left.push(b);
+    if (hit) { hit.forEach(i => used.add(i)); ok.push({ b, t: mine[hit[0]], ts: hit.map(i => mine[i]), split: true }); }
+    else left.push(b);
   }
-  // 4) Tutar farkı: aynı gün (±2) kalan işlemle
-  const still = [];
+
+  // 3) İade-net: gider A + iade R net olarak yazılmışsa öner (ör. 1000 gider, 150 iade → 850)
+  const left2 = [];
   for (const b of left) {
+    const ref = creditRows.find(c => c.d >= b.d && dayDiff(c.d, b.d) <= 3 && c.a < b.a && (isRefund(c) || sim(b.t, c.t) >= 0.35));
+    let best = null;
+    if (ref) {
+      const net = Math.round((b.a - ref.a) * 100) / 100;
+      mine.forEach((t, i) => {
+        if (used.has(i)) return;
+        if (Math.abs(t.a - net) >= 0.01) return;
+        if (!near(t, b, 5)) return;
+        if (!best || dayDiff(t.d, b.d) < best.dd) best = { i };
+      });
+    }
+    if (best) {
+      used.add(best.i);
+      creditRows.splice(creditRows.indexOf(ref), 1);
+      suggest.push({ b, t: mine[best.i], ts: [mine[best.i]], net: true, refund: ref });
+    } else left2.push(b);
+  }
+
+  // 4) Tutar farkı: aynı gün (±2) kalan işlemle
+  const still2 = [];
+  for (const b of left2) {
     let best = null;
     mine.forEach((t, i) => { if (!used.has(i) && near(t, b, 2)) { const r = Math.abs(t.a - b.a) / Math.max(t.a, b.a); if (r < 0.5 && (!best || r < best.r)) best = { i, r }; } });
-    if (best) { used.add(best.i); diff.push({ b, t: mine[best.i] }); } else still.push(b);
+    if (best) { used.add(best.i); diff.push({ b, t: mine[best.i] }); } else still2.push(b);
   }
+
   const extra = mine.filter((_, i) => !used.has(i));
-  return { ok, diff, missing: still, extra };
+  return { ok, suggest, diff, missing: still2, extra, credits: creditRows };
 }
 
 export function statementRowKey(kind, b, t) {
@@ -132,7 +207,7 @@ export function ignoreStatementRows(result, keys = []) {
     ignored.push({ b, t, key });
     return false;
   });
-  return { ...result, missing: filter(result.missing, "miss"), diff: filter(result.diff, "diff"), extra: filter(result.extra, "extra"), ok: filter(result.ok, "ok"), ignored };
+  return { ...result, missing: filter(result.missing, "miss"), diff: filter(result.diff, "diff"), extra: filter(result.extra, "extra"), ok: filter(result.ok, "ok"), suggest: filter(result.suggest || [], "suggest"), ignored };
 }
 
 // pdf.js ile PDF'i satırlara çevirir (yalnızca tarayıcıda).

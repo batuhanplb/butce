@@ -841,3 +841,45 @@ main{padding-top:22px}
   .mnav button{height:60px}
   .mnav button[aria-current="page"]{background:color-mix(in oklab,var(--primary) 12%,transparent)}
 }
+
+/* =================================================================
+   18. Ekstre eşleştirme tahtası (1.5.0.0)
+   İki sütun (ekstre | uygulama) + ortada bağlantı oku. Eşleşen çiftler
+   yan yana okla bağlı, öneriler onay bekler, boşta kalanlar dokunup
+   eşlenir. Yalnız sunum; eşleme statement.js, akışlar app.js içinde.
+   Blok silinerek geri alınabilir.
+   ================================================================= */
+.stmt-head{display:grid;grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr);gap:6px;padding:2px 2px 6px;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.stmt-head span{text-align:left;text-transform:uppercase}
+.stmtboard{display:flex;flex-direction:column;gap:6px}
+.sb-row{display:grid;grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr);gap:6px;align-items:stretch}
+.sb-c{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 9px;min-width:0;display:flex;flex-direction:column;gap:2px;position:relative}
+.sb-b{border-color:color-mix(in oklab,var(--muted) 28%,var(--line))}
+.sb-t{border-color:color-mix(in oklab,var(--primary) 30%,var(--line))}
+.sb-credit .sb-b{background:color-mix(in srgb,var(--inc) 7%,var(--surface))}
+.sb-l1{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.sb-d{font-size:10px;color:var(--muted);font-weight:600}
+.sb-a{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sb-a.neg{color:var(--ink)}.sb-a.pos{color:var(--inc)}
+.sb-l2{font-size:11.5px;line-height:1.3;overflow-wrap:anywhere;word-break:break-word}
+.sb-mid{display:grid;place-items:center;color:var(--muted)}
+.sb-mid svg{width:18px;height:18px}
+.sb-on{color:var(--inc)}.sb-sug{color:var(--primary)}.sb-diff{color:color-mix(in oklab,var(--exp) 60%,var(--muted))}.sb-miss{color:var(--exp)}.sb-credit{color:var(--inc)}
+.sb-ghost{border-style:dashed;border-color:var(--line);background:transparent;opacity:.5}
+.sb-cta{flex-direction:row;flex-wrap:wrap;gap:4px;align-items:center;justify-content:flex-start;padding:8px;opacity:1}
+.sb-act{padding:0 8px!important;height:26px!important;font-size:11px!important;flex:none}
+.sb-tag{position:absolute;top:-7px;right:6px;font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 6px;white-space:nowrap}
+.sb-ref{font-size:9.5px;color:var(--inc);font-weight:600}
+.sb-note{font-size:10px;color:var(--muted);line-height:1.35;margin-top:1px}
+.sb-edit{font-size:9px;color:var(--primary);cursor:pointer;margin-left:2px;text-decoration:underline dotted;text-underline-offset:2px}
+.sb-ck{width:22px;height:22px;flex:none;margin-top:4px}
+.sb-stack{display:flex;flex-direction:column;gap:4px}.sb-tx{border-bottom:1px dashed var(--line);padding-bottom:4px}.sb-tx:last-child{border-bottom:0;padding-bottom:0}
+.sb-pick{margin-bottom:8px}.sb-peek{margin:8px 0}
+.sb-row.sb-miss .sb-b{border-color:color-mix(in oklab,var(--exp) 45%,var(--line))}
+.sb-row.sb-picking .sb-ghost{visibility:hidden}
+@media(max-width:599px){
+  .stmt-head{grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:4px}
+  .sb-row{grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:4px}
+  .sb-c{padding:6px 7px}.sb-a{font-size:11.5px}.sb-l2{font-size:10.5px}
+  .sb-mid svg{width:15px;height:15px}
+}
