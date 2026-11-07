@@ -706,7 +706,7 @@ function vStmt(items) {
       h += sec("Ekstrede var, uygulamada yok", R.missing, "miss") + sec("Tutarı farklı", R.diff, "diff") + sec("Uygulamada var, ekstrede yok", R.extra, "extra") + sec("Eşleşenler ✓", R.ok, "ok");
       if (!R.missing.length && !R.diff.length && !R.extra.length) h += '<div class="empty">Her şey eşleşiyor ✓</div>';
     }
-  } else h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t)).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok.</div>';
+  } else h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t).replace('<span class="s">', '<span class="s">' + dLabel(t.d) + ' · ')).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok.</div>';
   S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
   return h + selBar();
 }
