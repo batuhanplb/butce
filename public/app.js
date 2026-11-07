@@ -1,10 +1,9 @@
 import * as C from "./core.js";
 import { formatAmountField } from "./transaction-input.js";
-import { stmtRange, parseStatementLines, statementTotal, statementRowKey, ignoreStatementRows, reconcile, pdfLines } from "./statement.js";
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.5.0.1";
+const APP_VERSION = "1.6.0.0";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -95,8 +94,6 @@ function landingHtml() {
        m("Kasım", "giriş 64.500 · çıkış 48.320", "+16.180", "ay sonu") + m("Aralık", "giriş 64.500 · çıkış 52.100", "+12.400", "ay sonu") + m("Ocak", "giriş 64.500 · çıkış 66.800", "-2.300", "eksiye düşüyor", "neg"))],
      ["Değişken tutarlar", "Faturan bazen 450 bazen 550 mi? Planı 500 bırak, o ayın gerçek tutarını ayrıca yaz; sonraki aylar bozulmaz. Maaş değişimlerini gelecek aylara önceden planla.", mini(["Elektrik", "Kasım"],
        m("Plan", "her ay aynı", "500,00", "sabit") + m("Gerçek fatura", "14 Kasım", "548,60", "+48,60 fark", "neg") + m("Aralık planı", "bozulmadı", "500,00", "sabit"))],
-     ["Ekstre eşleştirme", "Banka PDF'ini yükle; aynı gün ve tutardaki işlemler kendiliğinden eşleşir. 500 + 1500 gibi bölünmüş girişleri de tek ekstre satırına bağlarsın. Veri telefonundan çıkmaz, yapay zekâ kullanılmaz.", mini(["Ekstre", "PDF · 34 işlem"],
-       m("Migros · 24 Eki", "kart ekstresi", "-1.284,50", "eşleşti") + m("Maaş 500 + 1.500", "iki giriş tek satırda", "+2.000,00", "eşleşti"))],
      ["Kart kesim uyarısı", "Kartının hesap kesim günü gelince Öneri ve Dikkat alanına not düşer; dokununca o dönemin işlemleri açılır.", mini(["Öneri ve dikkat", "1 not"],
        note("Kart kesim günü yaklaşıyor", "24 Kasım · dokun → dönem işlemleri") + m("Dönem harcaması", "1–24 Kasım", "-9.960,00", "ekstreye girer"))],
      ["Borç takvimi", "Krediler, taksitler ve kart ödemeleri tarih sırasıyla. Taksit tutarını değiştirince toplam kendiliğinden güncellenir.", mini(["Borç takvimi", "3 kayıt"],
@@ -243,7 +240,7 @@ async function boot() {
     const h = location.hash.slice(1).split("?")[0];
     if (h === "settings" || h.startsWith("settings/")) { openSettings(h.split("/")[1] || "main", true); return; }
     if (S.settingsOpen) closeSheet(true);
-    if (VIEWS.includes(h) && h !== S.view) { rememberScroll(); S.view = h; S.stmt = null; S.sel = null; S.catF = null; S.payF = null; render(); restoreScroll(h); }
+    if (VIEWS.includes(h) && h !== S.view) { rememberScroll(); S.view = h; S.sel = null; S.catF = null; S.payF = null; render(); restoreScroll(h); }
   });
   const onUser = (u, err) => {
     if (err !== undefined) { S.authErr = err; render(); return; }
@@ -275,7 +272,6 @@ function renderSoon() { if (_rq) return; _rq = requestAnimationFrame(() => { _rq
 function render() {
   if (_rq) { cancelAnimationFrame(_rq); _rq = 0; }
   setTimeout(syncUrl, 0);
-  if (S.stmt && S.stmt.bank && S.months) try { stmtRun(); } catch (e) { console.error(e); }
   if (S.meta && S.meta.theme) applyTheme(S.meta.theme);
   const root = $("#root");
   if (!S.store) return;
@@ -431,7 +427,6 @@ let chRO = null, chQ = 0;
 function notifyDue() {
   try { if (!("Notification" in window) || Notification.permission !== "granted" || !meta().notif) return; const td = today(), k = "butce.notif." + td; if (localStorage.getItem(k)) return;
     const tm = new Date(Date.now() + 864e5).toISOString().slice(0, 10), due = derived().all.filter(t => t.k === "e" && (t.d === td || t.d === tm) && (t.rep || t.inst || t.sub));
-    meta().accounts.filter(a => a.type === "kart" && a.cut && +td.slice(8) === +a.cut).forEach(a => due.push({ n: a.name + " ekstresi kesildi", a: 0 }));
     if (!due.length) return; localStorage.setItem(k, "1");
     const body = due.slice(0, 5).map(t => (t.n || t.note || (catOf(t.cat) || {}).name || "Ödeme") + (t.a ? " · " + f2(t.a) : "")).join("\n");
     navigator.serviceWorker && navigator.serviceWorker.ready ? navigator.serviceWorker.ready.then(r => r.showNotification("Yaklaşan ödemeler", { body, icon: "/icons/icon-192.png" })).catch(() => new Notification("Yaklaşan ödemeler", { body })) : new Notification("Yaklaşan ödemeler", { body });
@@ -521,10 +516,9 @@ function vHome() {
     if (ti && te > ti) tips.push(["warn", "Gider geliri aştı", "Bu ay " + f2(te - ti) + " fazla harcama var.", "tx"]);
     const unc = cur.filter(t => t.k === "e" && !t.cat && !(t.sp && t.sp.length)).length;
     if (unc) tips.push(["info", unc + " işlem kategorisiz", "Kategori atarsanız raporlar daha doğru olur.", "tx"]);
-    meta().accounts.filter(a => a.type === "kart" && a.cut && !a.hidden).forEach(a => { const r = stmtRange(a.cut), nd = (new Date(today()) - new Date(r[1])) / 864e5; if (nd >= 0 && nd <= 4) { const tot = derived().all.filter(t => t.acc === a.id && t.k === "e" && t.d >= r[0] && t.d <= r[1]).reduce((q, t) => q + t.a, 0); tips.unshift(["warn", a.name + " ekstresi kesildi", "Dönem toplamı " + f2(tot) + ". Kontrol için dokun.", "stmt:" + a.id]); } });
     { const pm = prevM(CUR()); if (+today().slice(8) <= 5 && !(meta().reportSeen || {})[pm] && derived().all.some(t => t.d.startsWith(pm))) tips.unshift(["info", mLabel(pm) + " raporu hazır", "Geçen aya göre değişimleri görmek için dokun.", "rep:" + pm]); }
     if (!tips.length) tips.push(["ok", "Her şey yolunda", "Dikkat çeken bir durum görünmüyor.", null]);
-    return mod(svgI(CI.bolt), "Öneri ve dikkat", null, '<div class="tips">' + tips.slice(0, 8).map(([k, t, d, go]) => '<' + (go ? (go.startsWith("stmt:") ? 'button data-act="stmt" data-id="' + esc(go.slice(5)) + '"' : go.startsWith("rep:") ? 'button data-act="rep" data-m="' + esc(go.slice(4)) + '"' : 'button data-act="nav" data-v="' + go + '"') : 'div') + ' class="tip ' + k + '"><b>' + esc(t) + '</b><span class="muted small">' + esc(d) + '</span></' + (go ? 'button' : 'div') + '>').join("") + '</div>'); };
+    return mod(svgI(CI.bolt), "Öneri ve dikkat", null, '<div class="tips">' + tips.slice(0, 8).map(([k, t, d, go]) => '<' + (go ? (go.startsWith("rep:") ? 'button data-act="rep" data-m="' + esc(go.slice(4)) + '"' : 'button data-act="nav" data-v="' + go + '"') : 'div') + ' class="tip ' + k + '"><b>' + esc(t) + '</b><span class="muted small">' + esc(d) + '</span></' + (go ? 'button' : 'div') + '>').join("") + '</div>'); };
   const cols = debtCols();
   const cell = (d, mm) => (d.sched || []).filter(x => x.m === mm && !isPaid(d, x)).reduce((s, x) => s + x.a, 0);
   M.debtcal = x => { const nm = desk && x ? Math.max(6, 3 * Math.min(6, x.g.w)) : 6, hm = [...Array(nm)].map((_, i) => C.addM(CUR(), i)), gt = nm > 6 ? ' style="grid-template-columns:minmax(70px,1.3fr) repeat(' + nm + ',1fr)"' : '';
@@ -631,9 +625,7 @@ function vTx() {
   else if (S.payF) { const pf = S.payF.toLocaleLowerCase("tr"); items = D.all.filter(t => t.k !== "tr" && payName(t).toLocaleLowerCase("tr") === pf); }
   else if (qy) items = D.all.filter(t => ((t.t || "") + " " + (t.n || "") + " " + catLabel(t.cat) + " " + accName(t.acc)).toLocaleLowerCase("tr").includes(qs));
 
-  else if (S.stmt) items = D.all.filter(inStmt);
   else { const r = perRange(); items = D.all.filter(t => t.d >= r[0] && t.d <= r[1]); }
-  if (S.stmt) return vStmt(items.filter(t => t.acc === S.stmt.acc && t.k !== "tr"));
   if (S.fYear) items = items.filter(t => Number(t.d.slice(0, 4)) === S.fYear);
   const tdy = today();
   if (!S.showPastTx) items = items.filter(t => t.d >= tdy);
@@ -676,116 +668,10 @@ function vTx() {
   S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
   return h + out + '</ul></div>' + selBar();
 }
-function inStmt(t) { const st = S.stmt; if (!t.so) return t.d >= st.r[0] && t.d <= st.r[1]; const a = meta().accounts.find(x => x.id === st.acc) || {}, r = stmtRange(a.cut || 1, new Date(), st.off - t.so); return t.d >= r[0] && t.d <= r[1]; }
-function stmtDiffBtns(R, b, t) {
-  const i = R.diff.findIndex(y => y.b === b), pv = S.stmt.peek;
-  if (!pv || pv.i !== i) return '<button class="btn sm ghost" data-act="stmt-peek" data-w="pick" data-i="' + i + '">Eşleştir</button><button class="btn sm" data-act="stmt-peek" data-w="fix" data-i="' + i + '">Düzelt</button>';
-  const ac = (meta().accounts.find(a => a.id === t.acc) || {}).name || "";
-  return '</div><div class="card" style="padding:10px;margin:6px 0 4px;background:var(--bg)"><span class="muted small">Uygulamadaki işlem</span><br><b>' + esc(t.t || catLabel(t.cat, true)) + ' · ' + f2(t.a) + '</b><br><span class="muted small">' + dLabel(t.d) + ' · ' + esc(catLabel(t.cat, true) || "") + (ac ? ' · ' + esc(ac) : '') + (t.n ? ' · ' + esc(t.n) : '') + '</span><br><span class="small">' + (pv.w === "fix" ? 'Tutar ' + f2(t.a) + ' → ' + f2(b.a) + ' olacak.' : 'Bu satırla eşleştirilecek işlemleri seçeceksin.') + '</span><div class="chips" style="margin-top:8px"><button class="btn sm ghost" data-act="stmt-peek-x">Vazgeç</button><button class="btn sm ghost" data-act="edit-tx" data-id="' + esc(t.id) + '" data-m="' + t.d.slice(0, 7) + '">Aç</button>' + (pv.w === "fix" ? '<button class="btn sm" data-act="stmt-fix" data-i="' + i + '">Düzelt</button>' : '<button class="btn sm" data-act="stmt-pick" data-di="' + i + '">Eşleştir</button>') + '</div>';
-}
-function vStmt(items) {
-  const st = S.stmt, a = meta().accounts.find(x => x.id === st.acc) || { name: "Kart" };
-  if (!S.stmtSort && meta().stmtSort) S.stmtSort = meta().stmtSort;
-  const dir = S.stmtSort === "esk" ? 1 : -1;
-  const srt = (list, get) => list.slice().sort((x, y) => dir * ((get(x) || "").localeCompare(get(y) || "")));
-  items.sort((x, y) => dir * x.d.localeCompare(y.d));
-  const tot = items.reduce((q, t) => q + (t.k === "e" ? t.a : -t.a), 0), R = st.res;
-  let h = '<div class="toolbar"><button class="ib" data-act="stmt-per" data-v="-1" aria-label="Önceki ekstre">' + ICON.l + '</button><span style="flex:1;text-align:center"><b>' + esc(a.name) + '</b><br><span class="muted small">' + dLabel(st.r[0]) + ' – ' + dLabel(st.r[1]) + '</span></span><button class="ib" data-act="stmt-per" data-v="1" aria-label="Sonraki ekstre">' + ICON.r + '</button></div>';
-  h += '<div class="card"><div class="sum"><div>Uygulamada<b class="neg">' + f2(tot) + '</b></div><div>Ekstre<b>' + (R ? f2(R.bankTot) : "–") + '</b>' + (R ? '<span class="sb-edit" data-act="stmt-tot">düzelt</span>' : '') + '</div><div>Fark<b>' + (R ? f2(R.bankTot - tot) : "–") + '</b></div></div></div>';
-  h += '<div class="chips" style="margin:10px 0"><button class="btn sm" data-act="stmt-up">' + (st.busy ? "Okunuyor…" : R ? "Başka PDF yükle" : "Ekstre PDF yükle ve karşılaştır") + '</button><button class="btn sm ghost" data-act="stmt-sort">' + (dir === 1 ? "En eski" : "En yeni") + '</button><span style="flex:1"></span><button class="chip" data-act="stmt-close">Kapat ✕</button></div>';
-  if (st.err) h += '<div class="empty">' + esc(st.err) + '</div>';
-  const pk = st.pick;
-  const tn = t => esc(t.t || catLabel(t.cat, true));
-  if (!R) {
-    h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t).replace('<span class="s">', '<span class="s">' + dLabel(t.d) + ' · ')).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok. PDF yükleyince karşılaştırma çıkar.</div>';
-    S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
-    return h + selBar();
-  }
-  // ---- Görsel eşleştirme tahtası ----
-  const ARROW = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h14M12.5 6.5l5.5 5.5-5.5 5.5"/></svg>';
-  const PLUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-  const dCell = (d, name, amt, credit) => '<span class="sb-l1"><span class="sb-d">' + d.slice(8, 10) + '.' + d.slice(5, 7) + '</span><span class="sb-a' + (credit ? ' pos' : ' neg') + '">' + (credit ? "+" : "−") + f2(amt) + '</span></span><span class="sb-l2">' + esc(name) + '</span>';
-  const bcell = b => '<div class="sb-c sb-b' + (b.credit ? ' sb-credit' : '') + '">' + dCell(b.d, b.t || "İşlem", b.a, b.credit) + '</div>';
-  const tcell = t => '<div class="sb-c sb-t">' + dCell(t.d, tn(t), t.a, false) + '</div>';
-  const tcellStack = ts => '<div class="sb-c sb-t sb-stack">' + ts.map(t => '<div class="sb-tx">' + dCell(t.d, tn(t), t.a, false) + '</div>').join("") + '</div>';
-  const mid = (cls, icon, title) => '<div class="sb-mid ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + icon + '</div>';
-  const ghost = '<div class="sb-c sb-ghost"></div>';
-  const out = [];
-  const push = (bH, mH, tH, cls) => out.push('<div class="sb-row' + (cls ? " " + cls : "") + '">' + bH + mH + tH + '</div>');
-  const pfx = n => Math.abs(n) < 0.005 ? "✓" : "fark " + f2(n);
-
-  // Eşleşenler (ok)
-  for (const x of srt(R.ok, q => q.b.d)) {
-    const badge = x.manual ? (x.net ? "iade-net · elle" : "elle") : x.split ? "bölünmüş" : x.net ? "iade-net" : (x.t && x.t.d !== x.b.d ? "tarih farklı" : "");
-    const bH = bcell(x.b) + (badge ? '<span class="sb-tag">' + badge + '</span>' : '') + (x.refund ? '<span class="sb-ref">iade +' + f2(x.refund.a) + '</span>' : '');
-    const tH = (x.ts && x.ts.length > 1 ? tcellStack(x.ts) : tcell(x.t)) + (x.manual ? '<button class="btn sm ghost sb-act" data-act="stmt-unlink" data-d="' + x.b.d + '" data-a="' + x.b.a + '">Ayır</button>' : '<button class="btn sm ghost sb-act" data-act="stmt-ignore" data-key="' + esc(statementRowKey("ok", x.b, x.t)) + '">Yoksay</button>');
-    push(bH, mid("sb-on", ARROW, "Eşleşti"), tH, "sb-ok");
-  }
-  // Öneriler (suggest)
-  for (let i = 0; i < (R.suggest || []).length; i++) {
-    const x = R.suggest[i];
-    const note = x.net && x.refund ? ('Gider ' + f2(x.b.a) + ' − iade ' + f2(x.refund.a) + ' = net ' + f2(x.b.a - x.refund.a) + ' yazmışsın — doğru mu?') : (x.split ? 'Bölünmüş olabilir.' : 'Açıklama tam uyuşmadı — yine de bu mu?');
-    const bH = bcell(x.b) + (x.refund ? '<span class="sb-ref">iade +' + f2(x.refund.a) + '</span>' : '');
-    const tH = tcell(x.t) + '<span class="sb-note">' + esc(note) + '</span><button class="btn sm sb-act" data-act="stmt-confirm" data-i="' + i + '">Onayla</button><button class="btn sm ghost sb-act" data-act="stmt-ignore" data-key="' + esc(statementRowKey("suggest", x.b, x.t)) + '">Yoksay</button>';
-    push(bH, mid("sb-sug", PLUS, note), tH, "sb-sug");
-  }
-  // Tutarı farklı (diff)
-  for (const x of R.diff) {
-    const di = R.diff.indexOf(x);
-    const tH = tcell(x.t) + '<span class="sb-note">Ekstre ' + f2(x.b.a) + ' · sen ' + f2(x.t.a) + '</span><button class="btn sm ghost sb-act" data-act="stmt-peek" data-w="pick" data-i="' + di + '">Eşleştir</button><button class="btn sm ghost sb-act" data-act="stmt-peek" data-w="fix" data-i="' + di + '">Düzelt</button><button class="btn sm ghost sb-act" data-act="stmt-ignore" data-key="' + esc(statementRowKey("diff", x.b, x.t)) + '">Yoksay</button>';
-    push(bcell(x.b), mid("sb-diff", ARROW, "Tutar farklı"), tH, "sb-diff");
-  }
-  if (st.peek) {
-    const x = R.diff[st.peek.i];
-    if (x) {
-      const ac = (meta().accounts.find(q => q.id === x.t.acc) || {}).name || "";
-      h += '<div class="card sb-peek"><span class="muted small">Uygulamadaki işlem</span><br><b>' + esc(x.t.t || catLabel(x.t.cat, true)) + ' · ' + f2(x.t.a) + '</b><br><span class="muted small">' + dLabel(x.t.d) + ' · ' + esc(catLabel(x.t.cat, true) || "") + (ac ? ' · ' + esc(ac) : '') + (x.t.n ? ' · ' + esc(x.t.n) : '') + '</span><br><span class="small">' + (st.peek.w === "fix" ? 'Tutar ' + f2(x.t.a) + ' → ' + f2(x.b.a) + ' olacak.' : 'Bu satırla eşleştirilecek işlemleri seçeceksin.') + '</span><div class="chips" style="margin-top:8px"><button class="btn sm ghost" data-act="stmt-peek-x">Vazgeç</button><button class="btn sm ghost" data-act="edit-tx" data-id="' + esc(x.t.id) + '" data-m="' + x.t.d.slice(0, 7) + '">Aç</button>' + (st.peek.w === "fix" ? '<button class="btn sm" data-act="stmt-fix" data-i="' + st.peek.i + '">Düzelt</button>' : '<button class="btn sm" data-act="stmt-pick" data-di="' + st.peek.i + '">Eşleştir</button>') + '</div></div>';
-    }
-  }
-  // Ekstrede var, uygulamada yok (missing)
-  for (const b of R.missing) {
-    const i0 = R.missing.indexOf(b);
-    const tH = '<div class="sb-c sb-ghost sb-cta"><button class="btn sm sb-act" data-act="stmt-pick" data-i="' + i0 + '">Eşleştir</button><button class="btn sm ghost sb-act" data-act="stmt-add" data-i="' + i0 + '">Ekle</button><button class="btn sm ghost sb-act" data-act="stmt-ignore" data-key="' + esc(statementRowKey("miss", b, null)) + '">Yoksay</button></div>';
-    push(bcell(b), mid("sb-miss", "?", "Eşleşmemiş"), tH, "sb-miss");
-  }
-  // Uygulamada var, ekstrede yok (extra)
-  for (const t of R.extra) {
-    const tH = tcell(t) + (pk ? '<input type="checkbox" class="stmt-ck sb-ck" data-act="stmt-ck" data-id="' + esc(t.id) + '"' + (pk.ids.includes(t.id) ? ' checked' : '') + '>' : '<button class="btn sm ghost sb-act" data-act="edit-tx" data-id="' + esc(t.id) + '" data-m="' + t.d.slice(0, 7) + '">Aç</button><button class="btn sm ghost sb-act" data-act="stmt-ignore" data-key="' + esc(statementRowKey("extra", null, t)) + '">Yoksay</button>');
-    push(ghost, mid("", "", ""), tH, pk ? "sb-extra sb-picking" : "sb-extra");
-  }
-  // Ekstrenin iade/ödeme satırları (görünür)
-  for (const b of R.credits || []) {
-    push(bcell(b), mid("sb-credit", "", ""), ghost, "sb-credit");
-  }
-
-  if (pk) {
-    const sum = R.extra.filter(t => pk.ids.includes(t.id)).reduce((q, t) => q + t.a, 0);
-    h += '<div class="card sb-pick"><b>' + esc(pk.b.t || "İşlem") + ' · ' + f2(pk.b.a) + '</b><br><span class="muted small">' + dLabel(pk.b.d) + ' — sağdaki boşta işlemlerden seç. Seçilen: ' + f2(sum) + (Math.abs(sum - pk.b.a) < 0.01 ? ' ✓' : ' (' + pfx(pk.b.a - sum) + ')') + '</span><div class="chips" style="margin-top:8px"><button class="btn sm ghost" data-act="stmt-pick-x">Vazgeç</button><button class="btn sm" data-act="stmt-link"' + (pk.ids.length ? '' : ' disabled') + '>Eşleştir</button></div></div>';
-  }
-  h += '<div class="stmt-head"><span>EKSTRE</span><span></span><span>UYGULAMA</span></div><div class="stmtboard">' + out.join("") + '</div>';
-  if (R.ignored && R.ignored.length) h += '<details style="margin-top:10px"><summary>Yoksayılanlar (' + R.ignored.length + ')</summary><div class="card"><ul class="list">' + R.ignored.map(x => '<li><div class="set-row"><span class="grow">' + esc(x.t ? tn(x.t) : (x.b && x.b.t ? x.b.t : "İşlem")) + '</span><button class="btn sm ghost" data-act="stmt-restore" data-key="' + esc(x.key) + '">Geri al</button></div></li>').join("") + '</ul></div></details>';
-  if (!R.ok.length && !(R.suggest || []).length && !R.diff.length && !R.missing.length && !R.extra.length && !(R.credits || []).length && !R.ignored.length) h += '<div class="empty">Her şey eşleşiyor ✓</div>';
-  S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
-  return h + selBar();
-}
-function stmtRun() {
-  const st = S.stmt;
-  if (!st || !st.bank) return;
-  const a = meta().accounts.find(x => x.id === st.acc) || {}, cut = a.cut || 1;
-  const inRange = t => {
-    const eff = t.so ? stmtRange(cut, new Date(), st.off - t.so) : [st.r[0], st.r[1]];
-    return t.d >= C.ymd(new Date(new Date(eff[0]) - 3 * 864e5)) && t.d <= C.ymd(new Date(new Date(eff[1]).getTime() + 3 * 864e5));
-  };
-  const mine = derived().all.filter(t => t.acc === st.acc && t.k === "e" && inRange(t));
-  st.res = { ...reconcile(st.bank, mine, ((meta().stmtLinks || {})[st.acc]) || []), bankTot: st.bankTot ?? ((meta().stmtTot || {})[st.acc + "|" + st.r[0]] ?? statementTotal([], st.bank)) };
-  st.res.extra = st.res.extra.filter(inStmt);
-  st.res = ignoreStatementRows(st.res, (meta().stmtIgnored || {})[st.acc] || []);
-  if (st.pick) { const R = st.res, pb = st.pick.b; R.diff = R.diff.filter(x => { if (x.b.d === pb.d && x.b.a === pb.a && x.b.t === pb.t) { R.extra.push(x.t); return false; } return true; }); }
-}
 function selBar() {
   if (!S.sel) return "";
   const ids = Object.keys(S.sel), all = derived().all, tot = ids.reduce((s, id) => { const t = all.find(x => x.id === id); return !t || t.k === "tr" ? s : s + (t.k === "e" ? -t.a : t.a); }, 0);
-  return '<div class="selbar"><div class="selinfo"><b>' + ids.length + ' seçildi</b><span class="' + (tot < 0 ? "neg" : "pos") + '">Toplam: ' + (tot < 0 ? "-" : "") + f2(Math.abs(tot)) + '</span></div>' + (S.stmt ? '<button class="btn sm ghost" data-act="sel-so" data-v="1" title="Önceki ekstreye taşı">← Önceki ay</button><button class="btn sm ghost" data-act="sel-so" data-v="-1" title="Sonraki ekstreye taşı">Sonraki ay →</button>' : '<button class="btn sm ghost" data-act="sel-move"' + (ids.length ? '' : ' disabled') + '>Taşı</button><button class="btn sm ghost" data-act="sel-dup"' + (ids.length ? '' : ' disabled') + '>Çoğalt</button><button class="btn sm ghost" data-act="sel-all">Tümü</button>') + '<button class="btn sm ghost" data-act="sel-x">Vazgeç</button><button class="btn sm" style="background:var(--exp);color:#fff" data-act="sel-del"' + (ids.length ? "" : " disabled") + '>Sil</button></div>';
+  return '<div class="selbar"><div class="selinfo"><b>' + ids.length + ' seçildi</b><span class="' + (tot < 0 ? "neg" : "pos") + '">Toplam: ' + (tot < 0 ? "-" : "") + f2(Math.abs(tot)) + '</span></div>' + '<button class="btn sm ghost" data-act="sel-move"' + (ids.length ? '' : ' disabled') + '>Taşı</button><button class="btn sm ghost" data-act="sel-dup"' + (ids.length ? '' : ' disabled') + '>Çoğalt</button><button class="btn sm ghost" data-act="sel-all">Tümü</button>' + '<button class="btn sm ghost" data-act="sel-x">Vazgeç</button><button class="btn sm" style="background:var(--exp);color:#fff" data-act="sel-del"' + (ids.length ? "" : " disabled") + '>Sil</button></div>';
 }
 
 /* ---- debts ---- */
@@ -1084,7 +970,7 @@ function vInv() {
 }
 function vAcc() {
   const Dd = derived();
-  return '<div class="narrow"><div class="toolbar"><span class="small muted" style="flex:1">İşlemleri görmek için hesap adına dokunun.</span><button class="btn sm" data-act="acc-new">Hesap ekle</button></div><div class="card"><ul class="list">' + meta().accounts.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map(a => '<li class="acc-li" data-id="' + esc(a.id) + '"><div class="set-row catrow">' + (a.logo ? '<span class="cic logo" style="--sico:34px"><img src="' + esc(a.logo) + '" alt=""></span>' : '<span class="cic" style="--c:' + a.color + ';width:34px;height:34px">' + svgI(a.type === "kart" ? CI.card : a.type === "nakit" ? CI.coin : CI.home) + '</span>') + '<button class="grow" style="text-align:left" data-act="acc-tx" data-id="' + esc(a.id) + '">' + esc(a.name) + (a.type === "kart" ? ' <span class="tag">kredi kartı' + (a.cut ? ", kesim " + a.cut : "") + '</span>' : '') + (a.hidden ? ' <span class="tag">gizli</span>' : '') + '</button>' + (a.type === "kart" && a.cut ? '<button class="btn sm" data-act="stmt" data-id="' + esc(a.id) + '">Ekstre</button>' : '') + '<span class="bal ' + ((Dd.bal[a.id] || 0) < 0 ? "neg" : "") + '" style="white-space:nowrap">' + f2(Dd.bal[a.id] || 0) + '</span><button class="ib pen" data-act="acc-edit" data-id="' + esc(a.id) + '" aria-label="Düzenle">' + ICON.pen + '</button></div></li>').join("") + '</ul></div></div>';
+  return '<div class="narrow"><div class="toolbar"><span class="small muted" style="flex:1">İşlemleri görmek için hesap adına dokunun.</span><button class="btn sm" data-act="acc-new">Hesap ekle</button></div><div class="card"><ul class="list">' + meta().accounts.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map(a => '<li class="acc-li" data-id="' + esc(a.id) + '"><div class="set-row catrow">' + (a.logo ? '<span class="cic logo" style="--sico:34px"><img src="' + esc(a.logo) + '" alt=""></span>' : '<span class="cic" style="--c:' + a.color + ';width:34px;height:34px">' + svgI(a.type === "kart" ? CI.card : a.type === "nakit" ? CI.coin : CI.home) + '</span>') + '<button class="grow" style="text-align:left" data-act="acc-tx" data-id="' + esc(a.id) + '">' + esc(a.name) + (a.type === "kart" ? ' <span class="tag">kredi kartı' + (a.cut ? ", kesim " + a.cut : "") + '</span>' : '') + (a.hidden ? ' <span class="tag">gizli</span>' : '') + '</button>' + '<span class="bal ' + ((Dd.bal[a.id] || 0) < 0 ? "neg" : "") + '" style="white-space:nowrap">' + f2(Dd.bal[a.id] || 0) + '</span><button class="ib pen" data-act="acc-edit" data-id="' + esc(a.id) + '" aria-label="Düzenle">' + ICON.pen + '</button></div></li>').join("") + '</ul></div></div>';
 }
 function vCat() {
   const op = S.catExp || (S.catExp = {}), cats = meta().categories, mode = "", sel = S.catSel || (S.catSel = new Set()), cust = meta().catSort === "custom";
@@ -1873,7 +1759,7 @@ function download(name, text, type) {
 /* ============ events ============ */
 document.addEventListener("click", e => {
   const b = e.target.closest('[data-act]');
-  if (b && ['nav', 'acc-tx', 'stmt', 'mod-go', 'cat-tx', 'pay-tx', 'gt-open', 'set-nav'].includes(b.dataset.act)) rememberScroll();
+  if (b && ['nav', 'acc-tx', 'mod-go', 'cat-tx', 'pay-tx', 'gt-open', 'set-nav'].includes(b.dataset.act)) rememberScroll();
   if (b?.dataset.act !== 'acc-menu') document.querySelector('.account-pop')?.remove();
   const sg = document.getElementById("sugg"); if (sg && sg.innerHTML && !e.target.closest('#f-t')) { sg.innerHTML = ""; if (D) D.suggOff = true; }
 }, true);
@@ -1888,32 +1774,14 @@ document.addEventListener("click", e => {
     case "wipe-all": (async () => { if (!await ask("Tüm işlemler, borçlar ve ayarlar silinecek. Emin misin?", [{ l: "Devam", v: true, red: 1 }])) return; if (!await ask("Bu işlem geri alınamaz. Önce yedek indirmeni öneririz. Devam edilsin mi?", [{ l: "Evet, devam", v: true, red: 1 }])) return; if (!await ask("Son onay: tüm veriler kalıcı olarak silinsin mi?", [{ l: "Tüm verileri sil", v: true, red: 1 }])) return; Object.keys(S.months).forEach(m => saveMonth(m, [])); Object.keys(S.debts || {}).forEach(id => S.store.delDebt(id)); const sh = (meta().share || {}).token; if (sh) S.store.delShare(sh); S.meta = clone(DEFAULT_META); S.store.setMeta(S.meta); closeSheet(); render(); toast("Tüm veriler silindi"); })(); break;
     case "del-acc": (async () => { if (!await ask("Hesabın ve tüm verilerin kalıcı olarak silinecek. Emin misin?", [{ l: "Devam", v: true, red: 1 }])) return; if (!await ask("Bu işlem geri alınamaz. Son kez soruyoruz: hesap silinsin mi?", [{ l: "Hesabı sil", v: true, red: 1 }])) return; try { await S.store.deleteAccount(); closeSheet(); toast("Hesabın silindi"); } catch (e) { toast("Hesap silinemedi, internet bağlantını kontrol et"); } })(); break;
     case "bub": S.bub = S.bub === ds.v || !ds.v ? null : ds.v; render(); break;
-    case "nav": S.stmt = null; S.sel = null; S.bub = null; S.dashEdit = false; S.dashDraft = null; S.dashTray = false; S.view = ds.v; S.catF = null; S.payF = null; S.fYear = null; if (ds.v === "tx") { S.per = "30"; S.showPastTx = true; S.showE = true; S.showI = true; S.month = S.month || CUR(); S.accFs = []; S.q = ""; S.showFutTx = false; S.accOpen = true; } if (location.hash.slice(1) !== ds.v) location.hash = ds.v; render(); restoreScroll(ds.v); break;
+    case "nav": S.sel = null; S.bub = null; S.dashEdit = false; S.dashDraft = null; S.dashTray = false; S.view = ds.v; S.catF = null; S.payF = null; S.fYear = null; if (ds.v === "tx") { S.per = "30"; S.showPastTx = true; S.showE = true; S.showI = true; S.month = S.month || CUR(); S.accFs = []; S.q = ""; S.showFutTx = false; S.accOpen = true; } if (location.hash.slice(1) !== ds.v) location.hash = ds.v; render(); restoreScroll(ds.v); break;
     case "mprev": S.month = C.addM(S.month, -1); render(); break;
     case "hprev": S.hm = C.addM(S.hm || CUR(), -1); render(); break;
     case "hnext": S.hm = C.addM(S.hm || CUR(), 1); render(); break;
     case "mnext": S.month = C.addM(S.month, 1); render(); break;
-    case "stmt": { const a = meta().accounts.find(x => x.id === ds.id); if (!a) break; const r = stmtRange(a.cut || 1); S.stmt = { acc: a.id, off: 0, r, bankTot: (meta().stmtTot || {})[a.id + "|" + r[0]] }; S.view = "tx"; S.sel = null; if (location.hash.slice(1) !== "tx") location.hash = "tx"; render(); window.scrollTo(0, 0); break; }
-    case "stmt-per": { const a = meta().accounts.find(x => x.id === S.stmt.acc); S.stmt.off += +ds.v; S.stmt.r = stmtRange(a.cut || 1, new Date(), S.stmt.off); stmtRun(); render(); break; }
-    case "stmt-close": S.stmt = null; render(); break;
-    case "stmt-ignore":
-    case "stmt-restore": { const st = S.stmt; if (!st || !ds.key) break; const hide = a === "stmt-ignore"; saveMetaChange(m => { m.stmtIgnored = m.stmtIgnored || {}; const keys = m.stmtIgnored[st.acc] || []; m.stmtIgnored[st.acc] = hide ? [...new Set([...keys, ds.key])] : keys.filter(k => k !== ds.key); }); st.peek = null; st.pick = null; stmtRun(); render(); break; }
-    case "stmt-sort": { const nx = S.stmtSort === "esk" ? "yen" : "esk"; S.stmtSort = nx; saveMetaChange(m => { m.stmtSort = nx; }); render(); break; }
     case "rep": { const m = ds.m; if (S.settingsOpen) history.pushState(history.state, "", location.pathname + location.search + "#settings/rep?m=" + m); D = { view: "rep", m, back: ds.back || false }; renderSettings(); if (!(meta().reportSeen || {})[m] && S.loaded.meta) saveMetaChange(x => { x.reportSeen = { ...(x.reportSeen || {}), [m]: 1 }; }); break; }
-    case "stmt-pick": { S.stmt.peek = null; const R = S.stmt.res; let b; if (ds.di != null) { const x = R.diff[+ds.di]; b = x.b; S.stmt.pick = { b, ids: [x.t.id] }; } else { b = R.missing[+ds.i]; S.stmt.pick = { b, ids: [] }; } render(); window.scrollTo(0, 0); break; }
-    case "stmt-peek": S.stmt.peek = { i: +ds.i, w: ds.w }; render(); break;
-    case "stmt-peek-x": S.stmt.peek = null; render(); break;
-    case "stmt-pick-x": S.stmt.pick = null; stmtRun(); render(); break;
-    case "stmt-ck": { const pk = S.stmt.pick; if (!pk) break; const k = pk.ids.indexOf(ds.id); k >= 0 ? pk.ids.splice(k, 1) : pk.ids.push(ds.id); render(); break; }
-    case "stmt-link": { const pk = S.stmt.pick, acc = S.stmt.acc; if (!pk || !pk.ids.length) break; const L = { d: pk.b.d, a: pk.b.a, ids: pk.ids.slice() }; S.stmt.pick = null; saveMetaChange(m => { m.stmtLinks = m.stmtLinks || {}; m.stmtLinks[acc] = (m.stmtLinks[acc] || []).filter(l => !(l.d === L.d && Math.abs(l.a - L.a) < 0.01)).concat(L); }); stmtRun(); render(); toast("Eşleştirildi"); break; }
-    case "stmt-unlink": { const acc = S.stmt.acc, d = ds.d, a0 = +ds.a; saveMetaChange(m => { if (m.stmtLinks && m.stmtLinks[acc]) m.stmtLinks[acc] = m.stmtLinks[acc].filter(l => !(l.d === d && Math.abs(l.a - a0) < 0.01)); }); stmtRun(); render(); break; }
-    case "stmt-up": { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/pdf,.pdf"; inp.onchange = async () => { const f = inp.files[0]; if (!f || !S.stmt) return; S.stmt.busy = true; S.stmt.err = null; render(); try { const lines = await pdfLines(f), bank = parseStatementLines(lines); if (!bank.length) throw new Error("PDF'te işlem satırı bulunamadı."); S.stmt.bank = bank.filter(b => b.d >= S.stmt.r[0] && b.d <= S.stmt.r[1]).length ? bank.filter(b => b.d >= S.stmt.r[0] && b.d <= S.stmt.r[1]) : bank; S.stmt.bankTot = (meta().stmtTot || {})[S.stmt.acc + "|" + S.stmt.r[0]] ?? statementTotal(lines, S.stmt.bank); stmtRun(); } catch (e) { console.error(e); S.stmt.err = e.message && e.message.includes("bulunamadı") ? e.message : "PDF okunamadı."; } S.stmt.busy = false; render(); }; inp.click(); break; }
-    case "stmt-add": { const b = S.stmt.res.missing[+ds.i]; if (b) { S._stmtAdd = b; openTx({ k: "e", acc: S.stmt.acc, t: b.t, d: b.d, a: b.a }); } break; }
-    case "stmt-fix": { S.stmt.peek = null; const x = S.stmt.res.diff[+ds.i]; if (!x) break; const m = x.t.d.slice(0, 7), arr = monthItems(m).map(t => t.id === x.t.id ? { ...t, a: C.r2(x.b.a) } : t); S.months[m] = arr; saveMonth(m, arr); stmtRun(); render(); toast && toast("Tutar düzeltildi"); break; }
-    case "stmt-confirm": { const st = S.stmt, x = (st.res.suggest || [])[+ds.i]; if (!x) break; const L = { d: x.b.d, a: x.b.a, ids: x.ts.map(t => t.id) }; if (x.refund) L.ref = { d: x.refund.d, a: x.refund.a }; saveMetaChange(m => { m.stmtLinks = m.stmtLinks || {}; m.stmtLinks[st.acc] = (m.stmtLinks[st.acc] || []).filter(l => !(l.d === L.d && Math.abs(l.a - L.a) < 0.01)).concat(L); }); stmtRun(); render(); toast("Eşleştirildi"); break; }
-    case "stmt-tot": { const st = S.stmt; if (!st || !st.bank) break; const cur = st.bankTot ?? ((meta().stmtTot || {})[st.acc + "|" + st.r[0]] ?? 0); askText("Ekstre dönem borcu (toplam):", amtIn(cur)).then(v => { if (v == null) return; const n = parseFloat(String(v).replace(/\./g, "").replace(",", ".")); if (!isFinite(n)) return; st.bankTot = C.r2(n); saveMetaChange(m => { m.stmtTot = m.stmtTot || {}; m.stmtTot[st.acc + "|" + st.r[0]] = C.r2(n); }); stmtRun(); render(); toast("Toplam güncellendi"); }); break; }
     case "acc-menu": accountMenu(ds.id, el); break;
-    case "acc-tx": S.sel = null; S.accOpen = true; S.showPastTx = true; S.showFutTx = false; S.showE = true; S.showI = true; S.stmt = null; S.view = "tx"; S.accFs = [ds.id]; S.catF = null; S.payF = null; S.q = ""; S.per = "30"; if (location.hash.slice(1) !== "tx") location.hash = "tx"; render(); window.scrollTo(0, 0); break;
+    case "acc-tx": S.sel = null; S.accOpen = true; S.showPastTx = true; S.showFutTx = false; S.showE = true; S.showI = true; S.view = "tx"; S.accFs = [ds.id]; S.catF = null; S.payF = null; S.q = ""; S.per = "30"; if (location.hash.slice(1) !== "tx") location.hash = "tx"; render(); window.scrollTo(0, 0); break;
     case "add": openTx({}); break;
     case "fav": { const f = derived().favs[+ds.i]; openTx({ k: f.k, cat: f.cat, acc: f.acc, t: f.t }); break; }
     case "edit-tx": if (S.selSkip) { S.selSkip = false; break; } if (S.sel) { if (S.sel[ds.id]) delete S.sel[ds.id]; else S.sel[ds.id] = ds.m; if (!Object.keys(S.sel).length) S.sel = null; render(); break; } openTx({ id: ds.id, m: ds.m }); break;
@@ -1928,9 +1796,6 @@ document.addEventListener("click", e => {
     case "sel-move": ask("Neyi değiştirelim?", [{ l: "Kategori", v: "sel-cat" }, { l: "Hesap", v: "sel-acc" }]).then(v => { if (!v) return; const b = document.createElement("button"); b.dataset.act = v; b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }); break;
     case "sel-dup": { const sel = S.sel || {}; let n = 0; new Set(Object.values(sel)).forEach(m => { const arr = monthItems(m), add = arr.filter(t => sel[t.id]).map(t => { n++; const o = { ...clone(t), id: C.rid(), ts: Date.now() + n }; delete o.grp; return o; }); if (add.length) { const nx = arr.concat(add); S.months[m] = nx; saveMonth(m, nx); } }); S.sel = null; render(); if (history.state && history.state.sel) history.back(); toast(n + " işlem çoğaltıldı"); break; }
     case "sel-all": S.sel = S.sel || {}; (S._vis || []).forEach(([id, m]) => { S.sel[id] = m; }); render(); break;
-    case "sel-so": { const sel = S.sel || {}, dv = +ds.v, ms = new Set(Object.values(sel)); let n = 0;
-      ms.forEach(m => { const arr = monthItems(m).map(t => { if (!sel[t.id]) return t; n++; const so = (t.so || 0) - dv, o = { ...t }; if (so) o.so = so; else delete o.so; return o; }); S.months[m] = arr; saveMonth(m, arr); });
-      S.sel = null; stmtRun(); render(); toast(n + " işlem " + (dv > 0 ? "önceki" : "sonraki") + " ekstreye taşındı"); break; }
     case "sel-cat": { const selected = { ...(S.sel || {}) }; if (!Object.keys(selected).length) break;
       pickCat("Seçilen işlemlerin yeni kategorisi", new Set()).then(async id => { if (!id) return; const target = catOf(id); if (!target) return;
         const eligible = derived().all.filter(t => changeSelected(t, selected, "cat", target) !== t);
@@ -1996,7 +1861,7 @@ document.addEventListener("click", e => {
     case "app-reload": (async () => { toast("Kayıtlar gönderiliyor…"); try { if (S.store && S.store.flush) await Promise.race([S.store.flush(), new Promise(r => setTimeout(r, 8000))]); if (S.store && S.store.pending && S.store.pending()) { toast("Gönderilmemiş kayıt var, telefonda saklanıyor; tekrar deneyin."); return; } } catch (e) {} toast("Yenileniyor…"); try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister().catch(() => {}))); const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith("butce-")).map(k => caches.delete(k))); } catch (e) {} setTimeout(() => location.reload(), 300); })(); break;
     case "acct": openSettings(); break;
     case "set-back": openSettings(D.back === "reps" && D.view === "rep" ? "reps" : "main"); break;
-    case "set-nav": closeSheet(true); S.stmt = null; S.sel = null; S.bub = null; S.view = ds.v; S.catF = null; S.payF = null; if (location.hash.slice(1) !== ds.v) location.hash = ds.v; render(); window.scrollTo(0, 0); break;
+    case "set-nav": closeSheet(true); S.sel = null; S.bub = null; S.view = ds.v; S.catF = null; S.payF = null; if (location.hash.slice(1) !== ds.v) location.hash = ds.v; render(); window.scrollTo(0, 0); break;
     case "set-view": openSettings(ds.v); break;
     case "theme": setTheme(ds.v); renderSettings(); break;
     case "acc-new": D = { view: "acc" }; D.acc = { _new: true, id: "a-" + C.rid(), name: "", type: "banka", color: "#3166c9", start: 0, exclude: false, hidden: false, order: meta().accounts.length }; renderSettings(); break;
@@ -2076,7 +1941,7 @@ document.addEventListener("click", e => {
     case "accf-t": { const i = S.accFs.indexOf(ds.id); i >= 0 ? S.accFs.splice(i, 1) : S.accFs.push(ds.id); render(); break; }
     case "accf-clear": S.accFs = []; render(); break;
     case "per": S.per = ds.v; S.perMore = false; render(); break;
-    case "tx-reset": S.per = "30"; S.cFrom = ""; S.cTo = ""; S.q = ""; S.catF = null; S.payF = null; S.fYear = null; S.accFs = []; S.accOpen = false; S.stmt = null; S.showPastTx = true; S.showFutTx = false; S.showE = true; S.showI = true; render(); break;
+    case "tx-reset": S.per = "30"; S.cFrom = ""; S.cTo = ""; S.q = ""; S.catF = null; S.payF = null; S.fYear = null; S.accFs = []; S.accOpen = false; S.showPastTx = true; S.showFutTx = false; S.showE = true; S.showI = true; render(); break;
     case "tgl-past": S.showPastTx = !S.showPastTx; render(); break;
     case "tgl-e": S.showE = !S.showE; render(); break;
     case "tgl-i": S.showI = !S.showI; render(); break;

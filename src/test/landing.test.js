@@ -12,7 +12,6 @@ import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } 
 import { formatAmountField } from "../../public/transaction-input.js";
 import { incomeAmount, applyIncomeRange } from "../../public/cash-income.js";
 import { changeSelected } from "../../public/transaction-bulk.js";
-import { stmtRange, parseStatementLines, reconcile, pdfLines } from "../../public/statement.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // app.js bir ES modülüdür; jsdom modül çalıştıramadığı için import satırları
@@ -27,7 +26,6 @@ const APP_SRC = readFileSync(path.join(here, "../../public/app.js"), "utf8").rep
 const FEATURES = [
   "Nakit akışı",
   "Değişken tutarlar",
-  "Ekstre eşleştirme",
   "Kart kesim uyarısı",
   "Borç takvimi",
   "Düzenli ve abonelik",
@@ -55,7 +53,7 @@ function boot() {
       value: { getRandomValues: a => { for (let i = 0; i < a.length; i++) a[i] = Math.floor(Math.random() * 256); return a; } },
     });
   }
-  Object.assign(w, { C, incomeAmount, applyIncomeRange, changeSelected, formatAmountField, stmtRange, parseStatementLines, reconcile, pdfLines, simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK });
+  Object.assign(w, { C, incomeAmount, applyIncomeRange, changeSelected, formatAmountField, simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK });
   const dlg = w.document.getElementById("sheet");
   if (dlg && typeof dlg.showModal !== "function") {
     dlg.showModal = () => dlg.setAttribute("open", "");
@@ -109,7 +107,7 @@ describe("Tanıtım ekranı özellik örnekleri", () => {
     const dom = await landing();
     const doc = dom.window.document;
     const heads = [...doc.querySelectorAll(".ld-mini .m-top span:first-child")].map(txt);
-    ["Nakit akışı", "Elektrik", "Ekstre", "Öneri ve dikkat", "Borç takvimi", "Abonelikler", "Ekim raporu", "Günlük harcama", "Paylaşım", "İçe aktar"].forEach(h => {
+    ["Nakit akışı", "Elektrik", "Öneri ve dikkat", "Borç takvimi", "Abonelikler", "Ekim raporu", "Günlük harcama", "Paylaşım", "İçe aktar"].forEach(h => {
       expect(heads).toContain(h);
     });
     // Tutarlar tabular hizalı ve kırılmaz satırlarda gösterilir.

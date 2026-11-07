@@ -8,7 +8,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 import { formatAmountField } from "../../public/transaction-input.js";
-import { stmtRange, parseStatementLines, reconcile, pdfLines } from "../../public/statement.js";
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "../../public/cash-sim.js";
 
 async function app() {
@@ -21,7 +20,7 @@ async function app() {
   w.cancelAnimationFrame = id => w.clearTimeout(id);
   w.document.getElementById("sheet").showModal = function () { this.setAttribute("open", ""); };
   w.document.getElementById("sheet").close = function () { this.removeAttribute("open"); };
-  Object.assign(w, { C, incomeAmount, applyIncomeRange, periodsToAmts, changeSelected, formatAmountField, stmtRange, parseStatementLines, reconcile, pdfLines, simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK });
+  Object.assign(w, { C, incomeAmount, applyIncomeRange, periodsToAmts, changeSelected, formatAmountField, simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK });
   w.eval(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../public/app.js"), "utf8").replace(/^import[^\n]*\n/gm, "") + '\nwindow.state = S; window.setDraft = c => { D = { view: "ci", ci: c }; renderSettings(); }; window.getRange = perRange; window.remember = rememberScroll; window.restore = restoreScroll;');
   await new Promise(r => setTimeout(r, 30));
   return dom;

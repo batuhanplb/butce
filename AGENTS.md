@@ -17,6 +17,3 @@
 - Yayın akışı: `git push` → önizleme; canlıya geçiş yalnızca kullanıcı Publish'e basınca. Repo canlıdan ileride olması normaldir, raporlama/publish'e itme; canlının repodan ileri olması gerçek uyuşmazlıktır. Why: kullanıcı bu akışı istiyor.
 - Göreve başlamadan `git fetch origin` + `git status`; yerel `main` gerideyse önce al. Lovable dışından commit yazarı `batuhanplb <81333730+batuhanplb@users.noreply.github.com>`; pushed history asla yeniden yazılmaz. Why: Lovable düzenlemeleri git ile yansır, bot kimliği commit kartlarını gizler.
 - `APP_VERSION` (public/app.js, 1.a.b.c) her değişiklikte artar: son hane küçük, üçüncü özellik, ikinci büyük sistem. Why: kullanıcı sürümleri bununla izler.
-- Statement debt totals use the PDF's explicit TL period-debt header independently of transaction reconciliation; fallback nets refunds but excludes prior-debt payments. Why: spending sums are not the bank's closing debt.
-
-- Statement ignores are account-scoped row fingerprints in meta.stmtIgnored, applied after reconciliation with reversible display-only filtering. Why: ignoring must never delete transactions or alter totals.

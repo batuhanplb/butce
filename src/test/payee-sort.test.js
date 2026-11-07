@@ -9,7 +9,6 @@ import * as C from "../../public/core.js";
 import { formatAmountField } from "../../public/transaction-input.js";
 import { incomeAmount, applyIncomeRange } from "../../public/cash-income.js";
 import { changeSelected } from "../../public/transaction-bulk.js";
-import { stmtRange, parseStatementLines, reconcile, pdfLines } from "../../public/statement.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // app.js bir ES modülüdür; jsdom modül çalıştıramadığı için import satırları
@@ -48,7 +47,7 @@ function boot(seed) {
       value: { getRandomValues: a => { for (let i = 0; i < a.length; i++) a[i] = Math.floor(Math.random() * 256); return a; } },
     });
   }
-  Object.assign(w, { C, incomeAmount, applyIncomeRange, changeSelected, formatAmountField, stmtRange, parseStatementLines, reconcile, pdfLines });
+  Object.assign(w, { C, incomeAmount, applyIncomeRange, changeSelected, formatAmountField });
   const dlg = w.document.getElementById("sheet");
   if (dlg && typeof dlg.showModal !== "function") {
     dlg.showModal = () => dlg.setAttribute("open", "");
