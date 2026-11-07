@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.4.0.3";
+const APP_VERSION = "1.4.0.4";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -633,7 +633,7 @@ function vTx() {
 
   else if (S.stmt) items = D.all.filter(inStmt);
   else { const r = perRange(); items = D.all.filter(t => t.d >= r[0] && t.d <= r[1]); }
-  if (S.stmt) return vStmt(items.filter(t => t.acc === S.stmt.acc && t.k === "e"));
+  if (S.stmt) return vStmt(items.filter(t => t.acc === S.stmt.acc && t.k !== "tr"));
   if (S.fYear) items = items.filter(t => Number(t.d.slice(0, 4)) === S.fYear);
   const tdy = today();
   if (!S.showPastTx) items = items.filter(t => t.d >= tdy);
@@ -689,7 +689,7 @@ function vStmt(items) {
   const dir = S.stmtSort === "esk" ? 1 : -1;
   const srt = (list, get) => list.slice().sort((x, y) => dir * ((get(x) || "").localeCompare(get(y) || "")));
   items.sort((x, y) => dir * x.d.localeCompare(y.d));
-  const tot = items.reduce((q, t) => q + t.a, 0), R = st.res;
+  const tot = items.reduce((q, t) => q + (t.k === "e" ? t.a : -t.a), 0), R = st.res;
   let h = '<div class="toolbar"><button class="ib" data-act="stmt-per" data-v="-1" aria-label="Önceki ekstre">' + ICON.l + '</button><span style="flex:1;text-align:center"><b>' + esc(a.name) + '</b><br><span class="muted small">' + dLabel(st.r[0]) + ' – ' + dLabel(st.r[1]) + '</span></span><button class="ib" data-act="stmt-per" data-v="1" aria-label="Sonraki ekstre">' + ICON.r + '</button></div>';
   h += '<div class="card"><div class="sum"><div>Uygulamada<b class="neg">' + f2(tot) + '</b></div><div>Ekstre<b>' + (R ? f2(R.bankTot) : "–") + '</b></div><div>Fark<b>' + (R ? f2(R.bankTot - tot) : "–") + '</b></div></div></div>';
   h += '<div class="chips" style="margin:10px 0"><button class="btn sm" data-act="stmt-up">' + (st.busy ? "Okunuyor…" : R ? "Başka PDF yükle" : "Ekstre PDF yükle ve karşılaştır") + '</button><button class="btn sm ghost" data-act="stmt-sort" title="Tarihe göre sırala">' + (dir === 1 ? "En eski" : "En yeni") + '</button><span style="flex:1"></span><button class="chip" data-act="stmt-close">Kapat ✕</button></div>';
