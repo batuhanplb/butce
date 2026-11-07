@@ -117,6 +117,24 @@ export function reconcile(bank, mine, links = []) {
   return { ok, diff, missing: still, extra };
 }
 
+export function statementRowKey(kind, b, t) {
+  return JSON.stringify([kind, b ? [b.d, b.a, b.t, !!b.credit] : null, t?.id || null]);
+}
+
+// Yoksay yalnızca karşılaştırma sonucunu filtreler; tutarlara ve işlemlere dokunmaz.
+export function ignoreStatementRows(result, keys = []) {
+  const hidden = new Set(keys), ignored = [];
+  const filter = (list, kind) => list.filter(value => {
+    const b = kind === "miss" ? value : kind === "extra" ? null : value.b;
+    const t = kind === "extra" ? value : kind === "miss" ? null : value.t;
+    const key = statementRowKey(kind, b, t);
+    if (!hidden.has(key)) return true;
+    ignored.push({ b, t, key });
+    return false;
+  });
+  return { ...result, missing: filter(result.missing, "miss"), diff: filter(result.diff, "diff"), extra: filter(result.extra, "extra"), ok: filter(result.ok, "ok"), ignored };
+}
+
 // pdf.js ile PDF'i satırlara çevirir (yalnızca tarayıcıda).
 export async function pdfLines(file) {
   const pdfjs = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs");
