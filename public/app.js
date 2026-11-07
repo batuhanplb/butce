@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.4.0.1";
+const APP_VERSION = "1.4.0.2";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -706,7 +706,7 @@ function vStmt(items) {
       h += sec("Ekstrede var, uygulamada yok", R.missing, "miss") + sec("Tutarı farklı", R.diff, "diff") + sec("Uygulamada var, ekstrede yok", R.extra, "extra") + sec("Eşleşenler ✓", R.ok, "ok");
       if (!R.missing.length && !R.diff.length && !R.extra.length) h += '<div class="empty">Her şey eşleşiyor ✓</div>';
     }
-  } else h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t)).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok.</div>';
+  } else h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t).replace('<span class="s">', '<span class="s">' + dLabel(t.d) + ' · ')).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok.</div>';
   S._vis = items.map(t => [t.id, t.d.slice(0, 7)]);
   return h + selBar();
 }
