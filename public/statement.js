@@ -29,6 +29,21 @@ export function parseTrAmount(s) {
 const DATE_RE = /(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/;
 const AMT_RE = /[-(]?\d{1,3}(?:\.\d{3})*,\d{2}\)?-?|[-(]?\d+,\d{2}\)?-?/g;
 
+// Dönem borcu işlem toplamı değildir: devir, ödemeler ve iadeleri banka hesaplar.
+export function statementTotal(lines, rows) {
+  for (const raw of lines) {
+    const line = raw.replace(/\s+/g, " ").trim();
+    const match = line.match(/d[öo]nem borcu\s*(?:TL|₺)\s*:?\s*([-\d.,]+)/i);
+    if (match) {
+      const amount = parseTrAmount(match[1]);
+      if (Number.isFinite(amount)) return amount;
+    }
+  }
+  // Başlık bulunamazsa önceki borç ödemelerini değil, yalnızca iadeleri düş.
+  const total = rows.reduce((sum, row) => sum + (!row.credit ? row.a : /teşekkür|tesekkur/i.test(row.t) ? 0 : -row.a), 0);
+  return Math.round(total * 100) / 100;
+}
+
 // PDF'den çıkarılmış satırlardan işlem listesi: {d, a, t, credit}
 export function parseStatementLines(lines) {
   const out = [];
