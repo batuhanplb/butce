@@ -4,7 +4,7 @@ import { stmtRange, parseStatementLines, reconcile, pdfLines } from "./statement
 import { simMonths, simEstimate, simRemaining, simMonthlyTotals, SIM_LOOKBACK } from "./cash-sim.js";
 import { incomeAmount, applyIncomeRange, periodsToAmts } from "./cash-income.js";
 import { changeSelected } from "./transaction-bulk.js";
-const APP_VERSION = "1.4.0.5";
+const APP_VERSION = "1.4.1.0";
 const applyTheme = t => { t = ["dark", "soft", "softdark"].includes(t) ? t : "light"; document.documentElement.dataset.theme = t; try { localStorage.setItem("butce-theme", t); } catch (e) {} const m = document.querySelectorAll('meta[name="theme-color"]'); m.forEach(x => x.content = t === "dark" ? "#1c1f1f" : t === "softdark" ? "#2a2c30" : t === "soft" ? "#e6e3dc" : "#f5f5f3"); };
 try { applyTheme(localStorage.getItem("butce-theme")); } catch (e) {}
 function ask(msg, opts) {
@@ -696,7 +696,7 @@ function vStmt(items) {
   if (st.err) h += '<div class="empty">' + esc(st.err) + '</div>';
   const pk = st.pick;
   const tn = t => esc(t.t || catLabel(t.cat, true));
-  const row = (b, t, kind, x) => '<li><div class="set-row"><span class="grow"><b>' + esc(b ? b.t || "İşlem" : tn(t)) + '</b><br><span class="muted small">' + dLabel((b || t).d) + (b && t && kind === "diff" ? " · uygulamada " + f2(t.a) : "") + (kind === "ok" && x ? " · " + (x.manual ? "elle · " : x.split ? "bölünmüş · " : "") + x.ts.map(q => tn(q) + " " + f2(q.a)).join(" + ") : "") + '</span></span><b style="white-space:nowrap">' + f2((b || t).a) + '</b>' +
+  const row = (b, t, kind, x) => '<li><div class="set-row"><span class="grow"><b>' + (b || t).d.slice(8, 10) + '.' + (b || t).d.slice(5, 7) + ' · ' + esc(b ? b.t || "İşlem" : tn(t)) + '</b><br><span class="muted small">' + dLabel((b || t).d) + (b && t && kind === "diff" ? " · uygulamada " + f2(t.a) : "") + (kind === "ok" && x && x.t && x.t.d !== x.b.d ? " · uygulamada " + dLabel(x.t.d) : "") + (kind === "ok" && x ? " · " + (x.manual ? "elle · " : x.split ? "bölünmüş · " : "") + x.ts.map(q => tn(q) + " " + f2(q.a)).join(" + ") : "") + '</span></span><b style="white-space:nowrap">' + f2((b || t).a) + '</b>' +
     (kind === "miss" ? '<button class="btn sm ghost" data-act="stmt-pick" data-i="' + R.missing.indexOf(b) + '">Eşleştir</button><button class="btn sm" data-act="stmt-add" data-i="' + R.missing.indexOf(b) + '">Ekle</button>' : kind === "diff" ? stmtDiffBtns(R, b, t) : kind === "extra" ? (pk ? '<input type="checkbox" class="stmt-ck" data-act="stmt-ck" data-id="' + esc(t.id) + '"' + (pk.ids.includes(t.id) ? ' checked' : '') + ' style="width:22px;height:22px">' : '<button class="btn sm" data-act="edit-tx" data-id="' + esc(t.id) + '" data-m="' + t.d.slice(0, 7) + '">Aç</button>') : kind === "ok" && x && x.manual ? '<button class="btn sm ghost" data-act="stmt-unlink" data-d="' + b.d + '" data-a="' + b.a + '">Ayır</button>' : '') + '</div></li>';
   const sec = (title, list, kind) => { const L = srt(list, x => kind === "miss" ? x.d : kind === "extra" ? x.d : x.b.d); return L.length ? '<div class="day"><span>' + title + '</span><span>' + L.length + '</span></div><div class="card"><ul class="list">' + L.map(x => kind === "miss" ? row(x, null, kind) : kind === "extra" ? row(null, x, kind) : row(x.b, x.t, kind, x)).join("") + '</ul></div>' : ''; };
   if (R) {
@@ -706,7 +706,7 @@ function vStmt(items) {
       h += sec("Uygulamada var, ekstrede yok", R.extra, "extra");
       if (!R.extra.length) h += '<div class="empty">Eşleştirilecek boşta işlem yok.</div>';
     } else {
-      h += sec("Ekstrede var, uygulamada yok", R.missing, "miss") + sec("Tutarı farklı", R.diff, "diff") + sec("Uygulamada var, ekstrede yok", R.extra, "extra") + sec("Eşleşenler ✓", R.ok, "ok");
+      h += sec("Ekstrede var, uygulamada yok", R.missing, "miss") + sec("Tutarı farklı", R.diff, "diff") + sec("Uygulamada var, ekstrede yok", R.extra, "extra") + sec("Tarihi farklı (±3 gün)", R.ok.filter(x => x.t && x.t.d !== x.b.d), "ok") + sec("Eşleşenler ✓", R.ok.filter(x => !x.t || x.t.d === x.b.d), "ok");
       if (!R.missing.length && !R.diff.length && !R.extra.length) h += '<div class="empty">Her şey eşleşiyor ✓</div>';
     }
   } else h += items.length ? '<div class="card"><ul class="list">' + items.map(t => txRow(t).replace('<span class="s">', '<span class="s">' + dLabel(t.d) + ' · ')).join("") + '</ul></div>' : '<div class="empty">Bu dönemde işlem yok.</div>';
